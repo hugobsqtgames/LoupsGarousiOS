@@ -1,5 +1,5 @@
 import { phaseLabel, roleName } from './selectors';
-import type { BallotOutcome, DeathCause, GameEvent, GameState, LogEntry, PlayerId, StepKind, Winner } from './types';
+import type { BallotOutcome, DeathCause, GameAction, GameEvent, GameState, LogEntry, PlayerId, StepKind, Winner } from './types';
 
 /** Formatage des événements en français (pur, réutilisé par l'UI et les tests). */
 
@@ -165,4 +165,60 @@ export function describeEvent(state: GameState, e: GameEvent, hideSecrets = fals
 export function describeEntry(state: GameState, entry: LogEntry, hideSecrets = false): string {
   if (hideSecrets && entry.secret) return 'Action secrète (masquée).';
   return describeEvent(state, entry.event, hideSecrets);
+}
+
+/** Description courte d'une action déclarée par le MJ (vue « historique »). */
+export function describeAction(state: Pick<GameState, 'players' | 'setup'>, a: GameAction): string {
+  const n = (id: PlayerId | null | undefined) => nameOf(state, id);
+  switch (a.type) {
+    case 'night/submit': {
+      const [kind] = a.stepKey.split(':');
+      const title = STEP_TITLES[kind as StepKind] ?? kind;
+      const p = a.payload;
+      const parts: string[] = [];
+      if (p.target !== undefined) parts.push(p.target ? n(p.target) : 'aucune cible');
+      if (p.targets) parts.push(p.targets.map(n).join(' et ') || 'aucune cible');
+      if (p.heal) parts.push(`sauve ${n(p.heal)}`);
+      if (p.poison) parts.push(`empoisonne ${n(p.poison)}`);
+      if (p.infect !== undefined) parts.push(p.infect ? 'infecte' : 'n’infecte pas');
+      if (p.team) parts.push(p.team === 'wolves' ? 'camp des loups' : 'camp du village');
+      if (p.cardIndex !== undefined) parts.push(p.cardIndex === null ? 'aucune carte' : `carte ${p.cardIndex + 1}`);
+      if (p.littleGirlCaught) parts.push('Petite Fille surprise');
+      return `${title} : ${parts.join(', ') || 'fait'}`;
+    }
+    case 'night/resolve':
+      return 'Résolution de la nuit';
+    case 'dawn/confirm':
+      return 'Début du jour';
+    case 'day/end':
+      return 'La nuit tombe';
+    case 'ballot/open':
+      return a.kind === 'mayor' ? 'Ouverture de l’élection du maire' : 'Ouverture du vote d’élimination';
+    case 'ballot/candidate':
+      return `${a.add ? 'Candidature de' : 'Retrait de la candidature de'} ${n(a.playerId)}`;
+    case 'ballot/vote':
+      return `Voix${a.voterId ? ` de ${n(a.voterId)}` : ''} pour ${a.target === 'blank' ? 'blanc' : a.target === 'abstain' ? 'abstention' : n(a.target)}`;
+    case 'ballot/unvote':
+      return `Voix retirée${a.voterId ? ` (${n(a.voterId)})` : ''} : ${a.target === 'blank' ? 'blanc' : a.target === 'abstain' ? 'abstention' : n(a.target)}`;
+    case 'ballot/close':
+      return 'Clôture du scrutin';
+    case 'ballot/reopen':
+      return 'Réouverture du scrutin';
+    case 'ballot/confirm':
+      return 'Validation du scrutin';
+    case 'ballot/cancel':
+      return 'Annulation du scrutin';
+    case 'judge/second-vote':
+      return 'Second vote du Juge bègue';
+    case 'decision/resolve':
+      return `Décision : ${a.payload.target ? n(a.payload.target) : a.payload.targets ? a.payload.targets.map(n).join(', ') || 'personne' : a.payload.accept === undefined ? 'personne' : a.payload.accept ? 'acceptée' : 'refusée'}`;
+    case 'mj/eliminate':
+      return `Élimination manuelle de ${n(a.playerId)}`;
+    case 'mj/note':
+      return `Note : ${a.text}`;
+    case 'game/finish':
+      return 'Fin de la partie';
+    case 'game/abandon':
+      return 'Partie interrompue';
+  }
 }

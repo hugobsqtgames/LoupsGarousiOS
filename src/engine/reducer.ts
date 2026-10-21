@@ -7,7 +7,7 @@ import {
   openRunoff,
   reopenBallot,
   toggleCandidate,
-  useJudge,
+  applyJudge,
 } from './ballot';
 import { assert, emit, fail } from './core';
 import { killPlayers } from './deaths';
@@ -306,7 +306,7 @@ export function applyAction(state: GameState, action: GameAction): void {
       break;
     case 'judge/second-vote':
       requireNoVictory(state);
-      useJudge(state);
+      applyJudge(state);
       break;
     case 'decision/resolve':
       resolveDecision(state, action.decisionId, action.payload);

@@ -294,7 +294,7 @@ export function judgeCanCallSecondVote(state: GameState): boolean {
   return state.players.some((p) => p.roleId === 'juge-begue' && hasPowers(state, p) && (p.uses.judge ?? 0) > 0);
 }
 
-export function useJudge(state: GameState): void {
+export function applyJudge(state: GameState): void {
   assert(judgeCanCallSecondVote(state), 'judge-unavailable', 'Le Juge bègue ne peut pas déclencher de second vote maintenant.');
   const judge = state.players.find((p) => p.roleId === 'juge-begue' && hasPowers(state, p) && (p.uses.judge ?? 0) > 0)!;
   judge.uses.judge = 0;

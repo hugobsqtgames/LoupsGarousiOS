@@ -8,7 +8,7 @@ export * from './format';
 export * from './victory';
 export * from './invariants';
 export { applyAction, startGame } from './reducer';
-export { countBallot, talliesWithBonus, canOpenBallot, judgeCanCallSecondVote, ballotTargets, computeResult } from './ballot';
+export { countBallot, talliesWithBonus, leadersOf, canOpenBallot, judgeCanCallSecondVote, ballotTargets, computeResult } from './ballot';
 export { computeNightSteps, currentStep, pendingSteps, type NightStep } from './night/steps';
 export { attackedThisNight, packVictim, protectedThisNight } from './night/choices';
 export { foxGroup, foxFindsWolf, bearGrowls } from './night/resolve';
