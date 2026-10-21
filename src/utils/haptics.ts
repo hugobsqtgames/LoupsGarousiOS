@@ -9,9 +9,15 @@ export interface HapticsApi {
   warning(): void;
 }
 
-function run(fn: () => Promise<void>): void {
+/** Le retour haptique est accessoire : une erreur ne doit jamais empêcher l'action demandée. */
+function run(fn: () => Promise<void> | undefined): void {
   if (Platform.OS === 'web') return;
-  fn().catch(() => undefined);
+  try {
+    const p = fn();
+    if (p && typeof p.catch === 'function') p.catch(() => undefined);
+  } catch {
+    // ignoré volontairement
+  }
 }
 
 /** Retour haptique, respectant le réglage utilisateur et le mode discret. */
