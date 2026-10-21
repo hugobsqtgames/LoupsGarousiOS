@@ -14,6 +14,9 @@ import { configureDriverFactory } from '@/state/services';
 import type { SqlDriver } from '@/storage/driver';
 import { openNodeDriver } from '@/storage/node-driver';
 
+// Le premier rendu de l'arbre complet peut dépasser 5 s (instrumentation de couverture).
+jest.setTimeout(30_000);
+
 export async function resetApp(db: SqlDriver = openNodeDriver()): Promise<SqlDriver> {
   configureDriverFactory(async () => db);
   useAppStore.setState({ status: 'loading', settings: DEFAULT_SETTINGS, settingsError: null, games: [], compositions: [], customRoles: [] });
