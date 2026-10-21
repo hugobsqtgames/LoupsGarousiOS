@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Maquettes — Loups-Garous MJ</title>
+<!--
+  MAQUETTES STATIQUES (HTML/CSS) — ce ne sont PAS des captures de l'application.
+  Elles décrivent la cible visuelle (jetons du thème « Clair de lune ») des
+  12 écrans demandés. Les captures réelles sont dans docs/screenshots/web/.
+  Rendu PNG : node scripts/render-mockups.mjs
+-->
+<style>
+  :root {
+    --bg: #0A0F1E; --sky: #121A33; --horizon: #1F2747; --surface: #131A2E; --raised: #1A2340; --pressed: #222C4D;
+    --border: rgba(178,190,235,.14); --border2: rgba(178,190,235,.32); --text: #ECEEF6; --muted: #A2AAC6; --faint: #6D7596;
+    --accent: #E7C688; --on-accent: #1B1407; --moon: #F3E7C9; --village: #86C2AC; --wolves: #E36B5E; --solo: #B79BEA;
+    --danger: #EF6A57; --success: #7AD3A0; --warning: #EDBB57;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #05070d; color: var(--text); font-family: Inter, -apple-system, 'SF Pro Text', system-ui, sans-serif; }
+  .board { display: grid; grid-template-columns: repeat(4, 390px); gap: 40px; padding: 48px; width: max-content; }
+  .board h1 { grid-column: 1 / -1; font-family: Cinzel, 'Trajan Pro', Georgia, serif; letter-spacing: 2px; margin: 0; font-size: 34px; }
+  .board p.legend { grid-column: 1 / -1; color: var(--muted); margin: -24px 0 0; }
+  .frame { width: 390px; }
+  .label { font-size: 13px; color: var(--muted); margin-bottom: 10px; letter-spacing: 1px; text-transform: uppercase; }
+  .phone { width: 390px; height: 844px; border-radius: 48px; overflow: hidden; background: var(--bg); position: relative; box-shadow: 0 0 0 10px #1d2130, 0 30px 80px rgba(0,0,0,.6); }
+  .island { position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 120px; height: 34px; border-radius: 20px; background: #000; z-index: 5; }
+  .status { height: 54px; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 30px 6px; font-size: 15px; font-weight: 600; }
+  .sky { position: absolute; inset: 0 0 auto 0; height: 300px; background: linear-gradient(var(--bg), var(--sky) 55%, var(--horizon)); }
+  .sky .moon { position: absolute; right: 40px; top: 96px; width: 40px; height: 40px; border-radius: 50%; background: var(--moon); box-shadow: 0 0 60px 20px rgba(243,231,201,.25); }
+  .sky .forest { position: absolute; bottom: 0; left: 0; right: 0; height: 90px; background: #070B16; clip-path: polygon(0 60%,4% 40%,8% 62%,12% 20%,17% 58%,22% 35%,27% 60%,32% 45%,38% 64%,43% 10%,48% 58%,54% 40%,60% 62%,66% 25%,71% 60%,77% 44%,83% 62%,89% 15%,94% 58%,100% 40%,100% 100%,0 100%); }
+  .content { position: relative; z-index: 2; padding: 0 16px; }
+  .topbar { display: flex; justify-content: space-between; padding: 6px 0; }
+  .icon-btn { width: 44px; height: 44px; border-radius: 22px; background: var(--surface); border: 1px solid var(--border); display: grid; place-items: center; color: var(--text); font-size: 18px; }
+  .over { color: var(--accent); font-size: 11px; letter-spacing: 1.6px; text-transform: uppercase; font-weight: 600; margin-top: 18px; }
+  .title { font-family: Cinzel, Georgia, serif; font-size: 31px; font-weight: 700; letter-spacing: 1px; margin: 4px 0 6px; line-height: 1.15; }
+  .sub { color: var(--muted); font-size: 14px; }
+  .spacer { height: 60px; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 14px 16px; margin-bottom: 12px; }
+  .panel.accent { border-color: var(--accent); }
+  .panel.warn { border-color: var(--warning); }
+  .panel .ov { color: var(--accent); font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
+  .panel h3 { margin: 0 0 8px; font-size: 17px; }
+  .btn { height: 52px; border-radius: 12px; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; font-size: 16px; background: var(--accent); color: var(--on-accent); }
+  .btn.sec { background: var(--raised); color: var(--text); border: 1px solid var(--border2); }
+  .btn.danger { background: var(--danger); color: #1E0703; }
+  .btn.sm { height: 40px; font-size: 13px; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .row:last-child { border-bottom: 0; }
+  .av { width: 42px; height: 42px; border-radius: 21px; border: 1.5px solid var(--border2); background: var(--raised); display: grid; place-items: center; font-weight: 700; font-size: 14px; flex: none; position: relative; }
+  .av.v { border-color: var(--village); } .av.w { border-color: var(--wolves); } .av.s { border-color: var(--solo); }
+  .av .crown { position: absolute; top: -5px; right: -5px; width: 18px; height: 18px; border-radius: 9px; background: var(--accent); color: var(--on-accent); font-size: 10px; display: grid; place-items: center; }
+  .grow { flex: 1; } .muted { color: var(--muted); font-size: 13px; } .faint { color: var(--faint); font-size: 12px; }
+  .chip { display: inline-block; border: 1px solid currentColor; border-radius: 99px; padding: 2px 9px; font-size: 11px; margin-right: 4px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .opt { border: 1px solid var(--border); background: var(--surface); border-radius: 12px; padding: 13px 12px; font-weight: 600; font-size: 15px; }
+  .opt.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .opt.off { opacity: .38; }
+  .tl { display: flex; gap: 8px; margin-bottom: 12px; }
+  .tl span { border: 1px solid var(--border); border-radius: 12px; padding: 6px 10px; font-size: 11px; color: var(--muted); }
+  .tl span.on { border-color: var(--accent); color: var(--accent); }
+  .tl span.ok { color: var(--success); }
+  .vote { display: flex; align-items: center; gap: 10px; border: 1.5px solid var(--border); border-radius: 18px; padding: 8px 8px 8px 12px; margin-bottom: 8px; background: var(--surface); }
+  .vote.lead { border-color: var(--accent); } .vote.tie { border-color: var(--warning); }
+  .num { font-size: 28px; font-weight: 700; min-width: 40px; text-align: center; }
+  .cb { width: 54px; height: 54px; border-radius: 12px; display: grid; place-items: center; font-size: 26px; font-weight: 700; border: 1px solid var(--border2); }
+  .cb.plus { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .stats { display: flex; justify-content: space-between; text-align: center; }
+  .stats b { display: block; font-size: 26px; }
+  .stats span { color: var(--muted); font-size: 11px; }
+  .bar { height: 34px; border-radius: 10px; background: var(--accent); color: var(--on-accent); display: flex; align-items: center; padding: 0 12px; font-weight: 600; margin-top: 10px; }
+  .footer { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 34px; border-top: 1px solid var(--border); background: var(--bg); z-index: 3; display: flex; gap: 12px; }
+  .footer .btn { flex: 1; }
+  .seg { display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 3px; gap: 3px; margin-bottom: 12px; }
+  .seg span { flex: 1; text-align: center; padding: 9px 4px; border-radius: 8px; font-size: 12px; color: var(--muted); }
+  .seg span.on { background: var(--accent); color: var(--on-accent); }
+  .medal { width: 52px; height: 52px; border-radius: 26px; border: 1.5px solid var(--village); display: grid; place-items: center; color: var(--village); font-size: 22px; flex: none; background: var(--raised); }
+  .medal.w { border-color: var(--wolves); color: var(--wolves); }
+  .swatches { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .sw { border-radius: 16px; border: 1.5px solid var(--border); overflow: hidden; }
+  .sw.on { border-color: var(--accent); }
+  .sw .top { height: 64px; }
+  .sw .txt { padding: 8px 10px; font-size: 13px; font-weight: 600; background: var(--surface); }
+  .vol { display: flex; gap: 4px; align-items: flex-end; height: 30px; margin: 6px 0 12px; }
+  .vol i { flex: 1; border-radius: 3px; background: var(--pressed); }
+  .vol i.on { background: var(--accent); }
+  .toggle { width: 50px; height: 30px; border-radius: 15px; background: var(--accent); position: relative; flex: none; }
+  .toggle::after { content: ''; position: absolute; right: 3px; top: 3px; width: 24px; height: 24px; border-radius: 12px; background: var(--on-accent); }
+  .toggle.off { background: var(--pressed); } .toggle.off::after { left: 3px; right: auto; background: var(--muted); }
+</style>
+</head>
+<body>
+<div class="board" id="board">
+  <h1>Loups-Garous MJ — maquettes</h1>
+  <p class="legend">Maquettes statiques (HTML), thème « Clair de lune ». Elles ne sont pas des captures : voir docs/screenshots/web pour l’application réelle.</p>
+</div>
+<script>
+const P = (inner, { footer = '', title = '', over = '', sub = '', right = '⚙︎', back = true } = {}) => `
+  <div class="phone"><div class="island"></div><div class="sky"><div class="moon"></div><div class="forest"></div></div>
+  <div class="content"><div class="status"><span>21:30</span><span>●●● 100%</span></div>
+  <div class="topbar"><div class="icon-btn">${back ? '‹' : '&nbsp;'}</div><div class="icon-btn">${right}</div></div>
+  ${over ? `<div class="over">${over}</div>` : ''}${title ? `<div class="title">${title}</div>` : ''}${sub ? `<div class="sub">${sub}</div>` : ''}
+  <div class="spacer"></div>${inner}</div>${footer ? `<div class="footer">${footer}</div>` : ''}</div>`;
+const player = (ini, name, sub, cls = '', crown = false) => `<div class="row"><div class="av ${cls}">${ini}${crown ? '<span class="crown">♛</span>' : ''}</div><div class="grow"><div style="font-weight:600">${name}</div><div class="faint">${sub}</div></div><span class="faint">›</span></div>`;
+const screens = [
+  ['01 · Accueil', P(`
+    <div class="panel accent"><div class="ov">Partie en cours</div><h3>Soirée du vendredi</h3><div class="muted" style="margin-bottom:10px"><span class="chip" style="color:var(--accent)">Nuit 2</span> 8 / 10 en vie</div><div class="btn">▶ Reprendre la partie</div></div>
+    <div class="btn sec" style="height:58px;margin-bottom:16px">＋ Nouvelle partie</div>
+    <div class="faint" style="letter-spacing:1.6px;margin:8px 4px">COMPOSITIONS FAVORITES</div>
+    <div class="panel" style="display:flex;gap:12px;align-items:center"><span style="color:var(--accent)">★</span><div class="grow"><b>Classique à 10</b><div class="faint">10 joueurs</div></div>›</div>
+    <div class="grid2"><div class="panel" style="height:110px"><b>Parties</b><div class="faint">1 terminée</div></div><div class="panel"><b>Rôles</b><div class="faint">Catalogue</div></div><div class="panel" style="height:110px"><b>Statistiques</b></div><div class="panel"><b>Aide</b></div></div>`, { title: 'Loups-Garous', over: 'Carnet du maître du jeu', sub: 'Préparez la nuit, guidez le village.', back: false })],
+  ['02 · Création — joueurs', P(`
+    <div class="tl"><span class="on">Joueurs</span><span>Cartes</span><span>Attribution</span><span>Variantes</span><span>Récap.</span></div>
+    <div class="panel"><div class="ov">Ajouter un joueur</div><div style="display:flex;gap:8px"><div class="opt grow" style="color:var(--faint)">Nom ou pseudonyme</div><div class="icon-btn" style="width:52px;height:52px;color:var(--accent)">＋</div></div></div>
+    <div class="panel">${['Alice', 'Bruno', 'Chloé', 'David', 'Emma', 'Farid'].map((n, i) => `<div class="row"><span class="faint">${i + 1}</span><b class="grow">${n}</b><span class="faint">↑ ↓ ✎ 🗑</span></div>`).join('')}</div>`, { title: 'Joueurs', over: 'Étape 1 sur 5', footer: '<div class="btn">Suivant ›</div>', right: '🗑' })],
+  ['03 · Composition des rôles', P(`
+    <div class="panel"><div style="display:flex;justify-content:space-between"><div><b style="font-size:28px;color:var(--success)">10 / 10</b><div class="faint">cartes / joueurs</div></div><span class="chip" style="color:var(--success);height:22px">Équilibrée</span></div></div>
+    <div class="panel"><div class="ov">Composition automatique</div><div class="seg"><span>Découverte</span><span class="on">Équilibrée</span><span>Riche</span></div><div class="btn">🎲 Générer une composition</div><div class="faint" style="margin-top:8px">✦ 2 loups pour 10 joueurs (table de répartition)<br>✦ La Voyante est toujours incluse</div></div>
+    <div class="panel">${[['Loup-Garou', 'w', 2], ['Voyante', '', 1], ['Sorcière', '', 1], ['Chasseur', '', 1]].map(([n, c, k]) => `<div class="row"><div class="medal ${c}" style="width:40px;height:40px;font-size:16px">◉</div><div class="grow"><b>${n}</b></div><div class="cb" style="width:44px;height:44px;font-size:18px">−</div><b>${k}</b><div class="cb" style="width:44px;height:44px;font-size:18px">＋</div></div>`).join('')}</div>`, { title: 'Cartes', over: 'Étape 2 sur 5', footer: '<div class="btn sec">‹ Précédent</div><div class="btn">Suivant ›</div>' })],
+  ['04 · Liste des joueurs (tableau de bord)', P(`
+    <div class="panel accent"><div class="ov">Jour 2</div><h3>Le village débat</h3><div class="btn" style="margin-bottom:8px">🗳 Vote d’élimination</div><div class="btn sec">☾ La nuit tombe</div></div>
+    <div class="faint" style="letter-spacing:1.6px;margin:8px 4px">JOUEURS EN VIE (8) 🔒</div>
+    <div class="panel">${player('AL', 'Alice', '•••• rôle masqué')}${player('CH', 'Chloé', '•••• rôle masqué', '', true)}${player('DA', 'David', '•••• rôle masqué')}${player('EM', 'Emma', '•••• rôle masqué')}</div>`, { title: 'Soirée du vendredi', over: 'Jour 2 · 8 en vie', right: '👁', footer: '<div class="btn sec sm">↶ Annuler</div><div class="btn sec sm">✎ Note MJ</div>' })],
+  ['05 · Déroulement de la nuit', P(`
+    <div class="tl"><span class="ok">✓ Cupidon</span><span class="ok">✓ Salvateur</span><span class="on">3 Voyante</span><span>4 Loups</span></div>
+    <div class="panel" style="background:var(--raised)"><div style="display:flex;gap:12px"><div class="medal">👁</div><div><div class="ov">À dire au village</div><b>« Voyante, réveille-toi. Désigne le joueur dont tu veux connaître l’identité. »</b></div></div></div>
+    <div class="grid2"><div class="opt on">Alice ✓</div><div class="opt">Bruno</div><div class="opt off">Chloé<br><span class="faint">Elle-même</span></div><div class="opt">David</div><div class="opt">Emma</div><div class="opt">Farid</div></div>
+    <div class="panel accent" style="margin-top:12px;display:flex;gap:12px;align-items:center"><div class="medal w">🐺</div><div><div class="ov">Montrez la carte d’Alice</div><b style="font-size:22px">Loup-Garou</b></div></div>`, { title: 'La Voyante', over: 'Nuit 1 · étape 3 sur 6', right: '☰', footer: '<div class="btn">✓ Valider · se rendort</div>' })],
+  ['06 · Résolution des actions', P(`
+    <div class="panel"><div class="ov">Récapitulatif de la nuit</div>${[['Cupidon', 'Hugo et Inès'], ['Le Salvateur', 'Chloé'], ['La Voyante', 'Alice'], ['Les Loups-Garous', 'Jules'], ['La Sorcière', 'aucune potion']].map(([a, b]) => `<div class="row"><span class="grow">${a}</span><span class="muted">${b}</span></div>`).join('')}</div>
+    <div class="panel warn"><div class="faint" style="color:var(--warning)">Touchez une étape de la frise pour la corriger avant de résoudre.</div></div>`, { title: 'Fin de la nuit', over: 'Nuit 1 · toutes les étapes renseignées', right: '☰', footer: '<div class="btn" style="height:58px">☀ Résoudre la nuit</div>' })],
+  ['07 · Élection du maire', P(`
+    <div class="panel" style="background:var(--raised)"><div class="stats"><div><b>9</b><span>votants</span></div><div><b>8</b><span>bulletins</span></div><div><b>1</b><span>restant</span></div><div><b>8</b><span>voix</span></div></div><div class="bar">♛ En tête : Chloé (5)</div></div>
+    <div class="vote lead"><div class="av">CH</div><div class="grow"><b>Chloé</b><div class="faint">5 bulletins</div></div><div class="num" style="color:var(--accent)">5</div><div class="cb">−</div><div class="cb plus">＋</div></div>
+    <div class="vote"><div class="av">EM</div><div class="grow"><b>Emma</b><div class="faint">3 bulletins</div></div><div class="num">3</div><div class="cb">−</div><div class="cb plus">＋</div></div>
+    <div class="vote"><div class="av">✕</div><div class="grow"><b>Votes blancs</b></div><div class="num">0</div><div class="cb">−</div><div class="cb plus">＋</div></div>`, { title: 'Élection du maire', over: 'Jour 1', right: '↶', footer: '<div class="btn">🔒 Clôturer le scrutin</div>' })],
+  ['08 · Vote d’élimination', P(`
+    <div class="panel" style="background:var(--raised)"><div class="stats"><div><b>9</b><span>votants</span></div><div><b>7</b><span>bulletins</span></div><div><b>2</b><span>restants</span></div><div><b>9</b><span>voix</span></div></div><div class="bar" style="background:var(--warning)">⚠ Égalité : Alice, Bruno (3)</div></div>
+    <div class="vote tie"><div class="av">AL</div><div class="grow"><b>Alice</b><div class="faint" style="color:var(--warning)">1 bulletin · +2 maire</div></div><div class="num" style="color:var(--warning)">3</div><div class="cb">−</div><div class="cb plus">＋</div></div>
+    <div class="vote tie"><div class="av">BR</div><div class="grow"><b>Bruno</b><div class="faint">3 bulletins</div></div><div class="num" style="color:var(--warning)">3</div><div class="cb">−</div><div class="cb plus">＋</div></div>
+    <div class="vote"><div class="av">DA</div><div class="grow"><b>David</b><div class="faint">2 bulletins · +2 Corbeau</div></div><div class="num">2</div><div class="cb">−</div><div class="cb plus">＋</div></div>
+    <div class="panel accent" style="display:flex;gap:10px;align-items:center">♛<div class="grow"><b>Vote du maire (Chloé)</b><div class="faint">Pour Alice · compte ×2</div></div><div class="btn sec sm" style="width:84px">Changer</div></div>`, { title: 'Vote d’élimination', over: 'Jour 2', right: '↶', footer: '<div class="btn">🔒 Clôturer le scrutin</div>' })],
+  ['09 · Résumé de l’aube', P(`
+    <div class="panel accent"><div class="ov">À annoncer au village</div><div class="row"><div class="medal" style="width:44px;height:44px">☺</div><div><b>Jules</b><div class="muted">était Simple Villageois — dévoré(e) par les loups</div></div></div><div class="row"><span style="color:var(--danger)">🐻</span><b style="color:var(--danger)">Grognez : l’ours du Montreur grogne !</b></div></div>
+    <div class="panel warn"><div class="ov" style="color:var(--warning)">Décision requise</div><h3>Le Chasseur Emma tire</h3><div class="grid2"><div class="opt">Alice</div><div class="opt on">Bruno ✓</div></div></div>
+    <div class="faint" style="letter-spacing:1.6px;margin:8px 4px">DÉTAIL POUR LE MJ SEULEMENT</div>
+    <div class="panel"><div class="muted">🛡 Gaëlle protège Chloé.<br>👁 La Voyante découvre qu’Alice est Loup-Garou.</div></div>`, { title: 'Le village se réveille', over: 'Aube 1', footer: '<div class="btn" style="opacity:.45">☀ Passer au jour</div>' })],
+  ['10 · Fiche détaillée d’un joueur', P(`
+    <div class="panel" style="background:var(--raised);display:flex;gap:12px;align-items:center"><div class="av v" style="width:60px;height:60px">CH<span class="crown">♛</span></div><div class="grow"><b>En vie</b></div><div class="btn sec sm" style="width:96px">👁 Masquer</div></div>
+    <div class="panel"><div class="ov">Rôle secret</div><div style="display:flex;gap:12px;align-items:center"><div class="medal">👁</div><div><b style="font-family:Cinzel,Georgia;font-size:20px">VOYANTE</b><div style="color:var(--village);font-size:13px">Camp actuel : Village</div></div></div><div class="faint" style="margin-top:6px">Règle officielle confirmée</div></div>
+    <div class="panel"><div class="ov">Statuts et effets</div><span class="chip" style="color:var(--accent)">Maire</span><span class="chip" style="color:var(--wolves)">Amoureux</span><div class="muted" style="margin-top:8px">Amoureux de Hugo.</div></div>
+    <div class="btn danger">☠ Élimination manuelle</div>`, { title: 'Chloé', over: 'Place 3' })],
+  ['11 · Catalogue des rôles', P(`
+    <div class="opt" style="color:var(--faint);margin-bottom:10px">Rechercher un rôle…</div>
+    <div class="seg"><span class="on">Tous</span><span>Village</span><span>Loups</span><span>Solitaires</span></div>
+    <div class="panel">${[['Voyante', 'Village · Jeu de base', 'Chaque nuit, découvre le rôle d’un joueur.', ''], ['Loup-Garou', 'Loups-Garous · Jeu de base', 'Chaque nuit, la meute dévore un villageois.', 'w'], ['Salvateur', 'Village · Nouvelle Lune', 'Protège un joueur contre les loups.', ''], ['Infect Père des Loups', 'Loups · Personnages', 'Transforme la victime en loup.', 'w']].map(([n, t, d, c]) => `<div class="row"><div class="medal ${c}" style="width:44px;height:44px">◉</div><div class="grow"><b>${n}</b><div style="font-size:12px;color:var(--${c ? 'wolves' : 'village'})">${t}</div><div class="faint">${d}</div></div></div>`).join('')}</div>`, { title: 'Rôles', over: '30 rôles dans le grimoire', right: '＋' })],
+  ['12 · Paramètres audio et thèmes', P(`
+    <div class="swatches"><div class="sw on"><div class="top" style="background:#0A0F1E"></div><div class="txt">Clair de lune ✓</div></div><div class="sw"><div class="top" style="background:#07120E"></div><div class="txt">Forêt profonde</div></div><div class="sw"><div class="top" style="background:#12070A"></div><div class="txt">Lune de sang</div></div><div class="sw"><div class="top" style="background:#F1E7D3"></div><div class="txt">Parchemin</div></div></div>
+    <div class="panel"><div style="display:flex;justify-content:space-between"><b>Ambiances</b><span class="faint">50 %</span></div><div class="vol">${Array.from({ length: 10 }, (_, i) => `<i class="${i < 5 ? 'on' : ''}" style="height:${10 + i * 2}px"></i>`).join('')}</div>
+    <div style="display:flex;justify-content:space-between"><b>Effets sonores</b><span class="faint">70 %</span></div><div class="vol">${Array.from({ length: 10 }, (_, i) => `<i class="${i < 7 ? 'on' : ''}" style="height:${10 + i * 2}px"></i>`).join('')}</div>
+    <div style="display:flex;gap:12px;align-items:center"><div class="grow"><b>Narration des appels de nuit</b><div class="faint">Voix de l’appareil, hors ligne</div></div><div class="toggle"></div></div>
+    <div style="display:flex;gap:12px;align-items:center;margin-top:12px"><div class="grow"><b>Mode discret</b><div class="faint">Très sombre, sans son</div></div><div class="toggle off"></div></div></div>`, { title: 'Paramètres' })],
+];
+const board = document.getElementById('board');
+for (const [label, html] of screens) {
+  const f = document.createElement('div');
+  f.className = 'frame';
+  f.innerHTML = `<div class="label">Maquette · ${label}</div>${html}`;
+  board.appendChild(f);
+}
+</script>
+</body>
+</html>

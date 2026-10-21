@@ -43,7 +43,7 @@ export function PlayerRow({ state, player, hideSecrets, onPress, testID }: { sta
           {player.name}
         </AppText>
         {player.alive ? (
-          <SecretText text={role?.name ?? player.roleId} hidden={hideSecrets} tone={teamColor(colors, player.team)} />
+          <SecretText text={role?.name ?? player.roleId} hidden={hideSecrets} tone={teamColor(colors, player.team)} onPress={onPress} />
         ) : (
           <AppText variant="caption" tone="faint" numberOfLines={1}>
             {player.death ? `${DEATH_CAUSE_LABELS[player.death.cause]} · ${player.death.phaseLabel}` : 'Éliminé(e)'}

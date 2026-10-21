@@ -60,10 +60,10 @@ export function RoleCatalogScreen() {
         options={[
           { value: 'all', label: 'Tout' },
           { value: 'base', label: 'Base' },
-          { value: 'nouvelle-lune', label: 'N. Lune' },
-          { value: 'personnages', label: 'Perso.' },
+          { value: 'nouvelle-lune', label: 'Lune' },
+          { value: 'personnages', label: 'Perso' },
           { value: 'custom', label: 'Créés' },
-          { value: 'fav', label: 'Favoris' },
+          { value: 'fav', label: 'Fav.' },
         ]}
         testID="expansion-filter"
       />

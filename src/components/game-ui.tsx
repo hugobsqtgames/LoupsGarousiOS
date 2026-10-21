@@ -47,8 +47,11 @@ export function PlayerAvatar({ name, alive = true, mayor, team, size = 44 }: { n
   );
 }
 
-/** Texte secret : masqué tant que le MJ ne maintient pas l'appui. */
-export function SecretText({ text, hidden, tone }: { text: string; hidden: boolean; tone?: string }) {
+/**
+ * Texte secret : masqué tant que le MJ ne maintient pas l'appui (appui long).
+ * Un appui court est transmis à `onPress` (ex. ouvrir la fiche du joueur).
+ */
+export function SecretText({ text, hidden, tone, onPress }: { text: string; hidden: boolean; tone?: string; onPress?: () => void }) {
   const { colors } = useTheme();
   const [peek, setPeek] = useState(false);
   if (!hidden) {
@@ -59,7 +62,15 @@ export function SecretText({ text, hidden, tone }: { text: string; hidden: boole
     );
   }
   return (
-    <Pressable onPressIn={() => setPeek(true)} onPressOut={() => setPeek(false)} accessibilityRole="button" accessibilityLabel="Rôle masqué, maintenir pour afficher" hitSlop={8}>
+    <Pressable
+      onPress={onPress}
+      onLongPress={() => setPeek(true)}
+      onPressOut={() => setPeek(false)}
+      delayLongPress={250}
+      accessibilityRole="button"
+      accessibilityLabel="Rôle masqué, maintenir pour afficher"
+      hitSlop={8}
+    >
       <AppText variant="small" color={peek ? (tone ?? colors.textMuted) : colors.textFaint} numberOfLines={1}>
         {peek ? text : '•••• rôle masqué'}
       </AppText>

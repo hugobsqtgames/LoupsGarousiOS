@@ -41,7 +41,7 @@ export function OptionGrid({ options, selected, onSelect, testID, columns = 2 }:
             ]}
           >
             <View style={styles.cellText}>
-              <AppText variant="bodyStrong" color={active ? colors.onAccent : colors.text} numberOfLines={1}>
+              <AppText variant="bodyStrong" color={active ? colors.onAccent : colors.text} numberOfLines={2}>
                 {o.label}
               </AppText>
               {o.sublabel || (o.disabled && o.disabledReason) ? (

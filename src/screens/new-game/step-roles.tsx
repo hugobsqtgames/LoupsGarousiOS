@@ -17,6 +17,7 @@ import { useTheme } from '@/theme/theme-context';
 import { spacing, teamColor } from '@/theme/themes';
 
 const EXPANSIONS: Expansion[] = ['base', 'nouvelle-lune', 'personnages', 'custom'];
+const SHORT_EXPANSION: Record<Expansion, string> = { base: 'Base', 'nouvelle-lune': 'N. Lune', personnages: 'Perso', custom: 'Créés' };
 
 function RoleCountRow({ role, count, onChange, favorite }: { role: RoleDefinition; count: number; onChange: (n: number) => void; favorite: boolean }) {
   const { colors } = useTheme();
@@ -189,7 +190,7 @@ export function StepRoles() {
       <Segmented<Expansion | 'all'>
         value={filter}
         onChange={setFilter}
-        options={[{ value: 'all', label: 'Tous' }, ...EXPANSIONS.filter((e) => e !== 'custom' || all.some((r) => r.expansion === 'custom')).map((e) => ({ value: e, label: EXPANSION_LABELS[e] }))]}
+        options={[{ value: 'all', label: 'Tous' }, ...EXPANSIONS.filter((e) => e !== 'custom' || all.some((r) => r.expansion === 'custom')).map((e) => ({ value: e, label: SHORT_EXPANSION[e] }))]}
         testID="role-filter"
       />
       <Panel padded={false}>

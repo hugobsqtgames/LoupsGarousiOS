@@ -73,7 +73,7 @@ function OpenBallot({ state, kind }: { state: GameState; kind: BallotKind }) {
           value={mode}
           onChange={setMode}
           options={[
-            { value: 'tally', label: 'Compteur de voix (+ / −)' },
+            { value: 'tally', label: 'Compteur + / −' },
             { value: 'nominal', label: 'Qui vote pour qui' },
           ]}
           testID="vote-mode"
@@ -145,6 +145,25 @@ function BallotStats({ state, ballot }: { state: GameState; ballot: Ballot }) {
         </AppText>
       </View>
     </Panel>
+  );
+}
+
+/** Résumé compact, toujours visible au-dessus du bouton de clôture. */
+function LiveSummary({ state, ballot }: { state: GameState; ballot: Ballot }) {
+  const { colors } = useTheme();
+  const count = countBallot(ballot);
+  const { leaders, top } = leadersOf(talliesWithBonus(ballot));
+  const remaining = Math.max(0, ballot.voters.length - count.cast);
+  const lead = leaders.length === 0 ? 'Aucune voix' : leaders.length === 1 ? `En tête : ${nameOf(state, leaders[0])} (${top})` : `Égalité (${top}) : ${leaders.map((l) => nameOf(state, l)).join(', ')}`;
+  return (
+    <View style={styles.live} accessibilityLiveRegion="polite" testID="live-summary">
+      <AppText variant="caption" tone="muted">
+        {count.cast}/{ballot.voters.length} bulletins · {remaining} restant(s)
+      </AppText>
+      <AppText variant="caption" color={leaders.length > 1 ? colors.warning : leaders.length ? colors.accent : colors.textMuted} numberOfLines={1} style={styles.liveLead}>
+        {lead}
+      </AppText>
+    </View>
   );
 }
 
@@ -460,6 +479,8 @@ export function VoteScreen() {
       right={live ? <IconButton icon="undo" label="Annuler la dernière opération" disabled={!canUndoOp} onPress={() => { if (undo().ok) { audio.play('undo'); toast('Opération annulée', 'info'); } }} testID="undo-vote-op" /> : undefined}
       footer={
         live && live.status === 'open' ? (
+          <>
+          <LiveSummary state={state} ballot={live} />
           <Button
             label="Clôturer le scrutin"
             icon="lock"
@@ -472,6 +493,7 @@ export function VoteScreen() {
             }}
             testID="close-ballot"
           />
+          </>
         ) : undefined
       }
     >
@@ -524,4 +546,6 @@ const styles = StyleSheet.create({
   countBtn: { width: 56, height: 56, borderRadius: radius.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   voterChip: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: spacing.md, minHeight: 40 },
   resultRow: { flexDirection: 'row', paddingVertical: 2 },
+  live: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md },
+  liveLead: { flexShrink: 1, textAlign: 'right' },
 });
