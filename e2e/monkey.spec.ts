@@ -62,8 +62,8 @@ for (const seed of SEEDS) {
         if (r < 0.12 && (await inputs.count()) > 0) {
           if (process.env.MONKEY_TRACE) console.log(`geste ${step} : saisie ${page.url()}`);
           const k = Math.floor(random() * (await inputs.count()));
-          await inputs.nth(k).fill(['', 'Zoé', 'x'.repeat(40), 'Ana', '  ', 'Loup'][Math.floor(random() * 6)]).catch(() => undefined);
-          await inputs.nth(k).press('Enter').catch(() => undefined);
+          await inputs.nth(k).fill(['', 'Zoé', 'x'.repeat(40), 'Ana', '  ', 'Loup'][Math.floor(random() * 6)], { timeout: 2000 }).catch(() => undefined);
+          await inputs.nth(k).press('Enter', { timeout: 2000 }).catch(() => undefined);
         } else {
           const candidates = page.locator(CLICKABLE).filter({ visible: true });
           const n = await candidates.count();
