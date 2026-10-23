@@ -44,10 +44,12 @@ L’état (`GameState`) est **toujours recalculé** : `état = rejouer(configura
 | `ballot.ts` | scrutins : opérations +/− tracées (jamais un simple compteur global), votants identifiés ou anonymes, poids, Corbeau, égalités, seconds tours |
 | `victory.ts` | conditions de victoire, évaluées **uniquement sans décision en attente** et jamais pendant la nuit |
 | `reducer.ts` | application d’une action à un brouillon d’état |
-| `replay.ts`, `timeline.ts` | rejeu, annulation, correction ; la `Timeline` garde un point de contrôle toutes les 20 actions (annulation rapide sur les longues parties) |
-| `composition.ts` | composition automatique expliquée |
+| `replay.ts`, `timeline.ts` | rejeu, annulation, correction ; la `Timeline` garde un point de contrôle toutes les 20 actions (annulation rapide sur les longues parties) ; `ReplayCursor` : état après *k* actions pour le rejeu pas à pas |
+| `composition.ts` | composition automatique expliquée ; `learnBalance` : poids ajustés d’après les parties terminées |
 | `invariants.ts`, `fuzz.ts` | invariants métier et générateur de parties aléatoires à graine |
 | `format.ts` | textes français des événements et actions |
+| `events.ts` | 36 cartes Événement (résumés, portée, automatisations, outils), pioche, Spirite / répondant |
+| `narration.ts` | annonce de l’aube prête à lire (4 styles, déterministe), rappels contextuels, chronologie par phase |
 
 ### Copie d’état
 
@@ -76,7 +78,9 @@ Chaque action est appliquée à une copie (`cloneState`) ; les parties immuables
 - Design system : `theme/themes.ts` (4 thèmes + mode discret, contrastes WCAG testés), `components/` (boutons avec garde anti-double-appui de 450 ms, panneaux, grilles de sélection à grandes zones tactiles, feuilles modales, dialogues de confirmation, notifications).
 - Icônes : jeu SVG dessiné pour l’app (`react-native-svg`), aucune police d’icônes.
 - Polices locales : Cinzel (titres) et Inter (texte), embarquées.
-- Zones de sécurité, clavier (`KeyboardAvoidingView`), orientation portrait.
+- Zones de sécurité (y compris latérales en paysage), clavier (`KeyboardAvoidingView`), toutes orientations, iPad et Split View : `useWideLayout` passe en deux colonnes au-delà de 900 points (700 en paysage).
+- Accessibilité : rôle et nom pour chaque contrôle (audit automatisé `a11y.test.tsx`), Dynamic Type (agrandissement jusqu’à ×2,2 pour le texte courant), contraste élevé (`highContrastPalette`, AAA testé), animations réduites (réglage système ou application), annonces VoiceOver des messages.
+- Illustrations : `src/art/role-art.ts` produit un SVG déterministe par rôle (affiché via `SvgXml`, exporté en PNG par `scripts/render-role-art.mjs`) ; `src/art/recap.ts` produit l’image récapitulative, convertie en PNG sur l’appareil (`toDataURL` de react-native-svg) puis partagée (expo-sharing).
 
 ## Audio (`src/audio`)
 
@@ -93,3 +97,5 @@ Chaque action est appliquée à une copie (`cloneState`) ; les parties immuables
 | Routes web non asynchrones | la version web fonctionne aussi réseau coupé |
 | Sons synthétisés | ressources locales, licence maîtrisée |
 | `expo-speech` | narration réelle sans fichiers ni réseau |
+| Glisser-déposer avec `PanResponder` | API stable du cœur de React Native, fonctionne aussi sur le web ; alternative accessible par boutons |
+| Événements « guidés » plutôt que tout automatiser | les 36 cartes ont des effets très variés ; seules les cartes à effet précis sont automatisées, les autres passent par des outils MJ tracés et annulables |

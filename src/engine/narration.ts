@@ -13,7 +13,7 @@ export type AnnouncementStyle = 'sobre' | 'dramatique' | 'conte' | 'humour';
 
 export const ANNOUNCEMENT_STYLES: { value: AnnouncementStyle; label: string }[] = [
   { value: 'sobre', label: 'Sobre' },
-  { value: 'dramatique', label: 'Dramatique' },
+  { value: 'dramatique', label: 'Drame' },
   { value: 'conte', label: 'Conte' },
   { value: 'humour', label: 'Humour' },
 ];

@@ -6,6 +6,8 @@ import { activeBallot, canOpenBallot, computeNightSteps, judgeCanCallSecondVote,
 import { DebateTimer } from '@/components/debate-timer';
 import { OptionGrid, playerOptions } from '@/components/player-picker';
 import { RemindersPanel } from '@/components/reminders';
+import { PlayerBoard } from '@/components/player-board';
+import { useWideLayout } from '@/hooks/use-layout';
 import { useAppStore } from '@/state/app-store';
 import { EventsPanel, MjToolsSheet, type MjTool } from './events-panel';
 import { Button, IconButton } from '@/components/button';
@@ -176,6 +178,7 @@ export function GameDashboard() {
   const [toolsOpen, setToolsOpen] = useState(false);
   const [tool, setTool] = useState<MjTool | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const wide = useWideLayout();
   const generalReminders = reminders(state).filter((r) => !hide || !SECRET_REMINDERS.has(r.id));
   const [note, setNote] = useState('');
   const alive = state.players.filter((p) => p.alive);
@@ -188,6 +191,7 @@ export function GameDashboard() {
       title={state.setup.name}
       back={toHome}
       mood={state.phase.kind === 'day' ? 'day' : state.phase.kind === 'dawn' ? 'dawn' : 'night'}
+      wide={wide}
       right={
         <>
           <IconButton icon={hide ? 'eye-off' : 'eye'} label={hide ? 'Afficher les rôles' : 'Masquer les rôles'} onPress={() => setHide(!hide)} active={!hide} testID="toggle-secrets" />
@@ -205,6 +209,8 @@ export function GameDashboard() {
         ) : undefined
       }
     >
+      <View style={wide ? styles.columns : styles.gapCol}>
+        <View style={wide ? styles.mainCol : styles.gapCol}>
       <View style={styles.saveRow}>
         <SaveIndicator save={save} onRetry={retrySave} />
       </View>
@@ -248,6 +254,10 @@ export function GameDashboard() {
           {state.setup.dealMode === 'phone' && state.phase.kind !== 'ended' ? <Button label="Revoir un rôle" icon="phone" variant="secondary" size="sm" onPress={() => setReviewOpen(true)} style={styles.flex} testID="review-role" /> : null}
         </View>
       ) : null}
+        </View>
+        <View style={wide ? styles.sideCol : styles.gapCol}>
+          {wide ? <PlayerBoard state={state} hide={hide} testID="dashboard-board" /> : (
+            <>
       <SectionTitle right={hide ? <Icon name="lock" color={colors.textFaint} size={16} /> : undefined}>{`Joueurs en vie (${alive.length})`}</SectionTitle>
       <Panel padded={false}>
         {alive.map((p) => (
@@ -264,6 +274,10 @@ export function GameDashboard() {
           </Panel>
         </>
       ) : null}
+            </>
+          )}
+        </View>
+      </View>
       <MjToolsSheet
         state={state}
         visible={toolsOpen}
@@ -314,5 +328,9 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   footerRow: { flexDirection: 'row', gap: spacing.md },
   saveRow: { flexDirection: 'row', justifyContent: 'flex-end' },
+  columns: { flexDirection: 'row', gap: spacing.xl, alignItems: 'flex-start' },
+  mainCol: { flex: 3, gap: spacing.md, minWidth: 0 },
+  sideCol: { flex: 2, gap: spacing.md, minWidth: 0 },
+  gapCol: { gap: spacing.md },
   noteInput: { minHeight: 100, textAlignVertical: 'top', paddingTop: spacing.md },
 });

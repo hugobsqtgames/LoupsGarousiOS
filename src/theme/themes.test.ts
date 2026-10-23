@@ -1,5 +1,5 @@
 import { contrastRatio } from './contrast';
-import { discreetPalette, THEMES } from './themes';
+import { discreetPalette, highContrastPalette, THEMES } from './themes';
 
 describe('contrastes des thèmes (WCAG)', () => {
   for (const theme of Object.values(THEMES)) {
@@ -19,6 +19,16 @@ describe('contrastes des thèmes (WCAG)', () => {
       expect(contrastRatio(d.text, d.surface)).toBeGreaterThanOrEqual(4.5);
       expect(contrastRatio(d.textMuted, d.surface)).toBeGreaterThanOrEqual(3);
       expect(contrastRatio(d.onAccent, d.accent)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it(`${theme.name} en contraste élevé : AAA pour le texte principal et secondaire, bordures visibles`, () => {
+      const h = highContrastPalette(c, theme.dark);
+      for (const bg of [h.background, h.surface, h.surfaceRaised]) {
+        expect(contrastRatio(h.text, bg)).toBeGreaterThanOrEqual(contrastRatio(c.text, bg));
+        expect(contrastRatio(h.textMuted, bg)).toBeGreaterThanOrEqual(7);
+        expect(contrastRatio(h.textFaint, bg)).toBeGreaterThanOrEqual(4.5);
+      }
+      expect(contrastRatio(h.borderStrong, h.surface)).toBeGreaterThanOrEqual(3);
     });
   }
 });

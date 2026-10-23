@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { computeNightSteps, nameOf, phaseLabel, reminders, STEP_TITLES, type NightStep, type StepPayload } from '@/engine';
 import { RemindersPanel } from '@/components/reminders';
+import { PlayerBoard } from '@/components/player-board';
+import { useWideLayout } from '@/hooks/use-layout';
 import { useAppStore } from '@/state/app-store';
 import { useAudio } from '@/audio/audio-context';
 import { Button, IconButton } from '@/components/button';
@@ -103,6 +105,7 @@ export function NightScreen() {
   const showActors = viewed ? (actorsShown[viewed.key] ?? !hide) : false;
   const lastNarrated = useRef<string | null>(null);
   const wolfHowl = useAppStore((s) => s.settings.wolfHowl);
+  const wide = useWideLayout();
 
   useEffect(() => {
     if (!viewed || viewKey || lastNarrated.current === viewed.key) return;
@@ -149,6 +152,7 @@ export function NightScreen() {
     <Screen
       overline={`${phaseLabel(state.phase)} · ${viewed ? `étape ${index + 1} sur ${steps.length}` : 'toutes les étapes renseignées'}`}
       title={viewed ? stepTitle(viewed, registry, STEP_TITLES) : 'Fin de la nuit'}
+      wide={wide}
       back={() => toDashboard(state.setup.id)}
       right={<IconButton icon="list" label="Tableau de bord" onPress={() => toDashboard(state.setup.id)} />}
       footer={
@@ -169,6 +173,8 @@ export function NightScreen() {
         )
       }
     >
+      <View style={wide ? styles.columns : styles.gapCol}>
+        <View style={wide ? styles.mainCol : styles.gapCol}>
       <Timeline steps={steps} current={viewed?.key ?? null} onSelect={(k) => setViewKey(k === firstPending?.key ? null : k)} />
       {viewed ? (
         <>
@@ -206,6 +212,13 @@ export function NightScreen() {
       ) : (
         <Summary steps={steps} />
       )}
+        </View>
+        {wide ? (
+          <View style={styles.sideCol} testID="night-board">
+            <PlayerBoard state={state} hide={hide} />
+          </View>
+        ) : null}
+      </View>
     </Screen>
   );
 }
@@ -219,4 +232,8 @@ const styles = StyleSheet.create({
   cardHead: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
   actors: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 36 },
   summaryRow: { flexDirection: 'row', gap: spacing.md, paddingVertical: 4 },
+  columns: { flexDirection: 'row', gap: spacing.xl, alignItems: 'flex-start' },
+  mainCol: { flex: 3, gap: spacing.md, minWidth: 0 },
+  sideCol: { flex: 2, gap: spacing.md, minWidth: 0 },
+  gapCol: { gap: spacing.md },
 });

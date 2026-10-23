@@ -242,3 +242,27 @@ export function discreetPalette(base: Palette): Palette {
 export function teamColor(c: Palette, team: 'village' | 'wolves' | 'solo'): string {
   return team === 'village' ? c.village : team === 'wolves' ? c.wolves : c.solo;
 }
+
+function mix(a: string, b: string, t: number): string {
+  const pa = a.replace('#', '');
+  const pb = b.replace('#', '');
+  const ch = (h: string, i: number) => parseInt(h.slice(i, i + 2), 16);
+  const out = [0, 2, 4].map((i) => Math.round(ch(pa, i) * (1 - t) + ch(pb, i) * t).toString(16).padStart(2, '0'));
+  return `#${out.join('')}`;
+}
+
+/**
+ * Variante « contraste élevé » : texte pur, texte secondaire presque aussi
+ * contrasté que le texte principal, bordures opaques et marquées.
+ */
+export function highContrastPalette(base: Palette, dark: boolean): Palette {
+  const ink = dark ? '#FFFFFF' : '#000000';
+  return {
+    ...base,
+    text: ink,
+    textMuted: mix(ink, base.background, 0.12),
+    textFaint: mix(ink, base.background, 0.3),
+    border: mix(ink, base.background, 0.55),
+    borderStrong: mix(ink, base.background, 0.2),
+  };
+}

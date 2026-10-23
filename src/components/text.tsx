@@ -11,6 +11,23 @@ interface AppTextProps extends TextProps {
   color?: string;
 }
 
+/**
+ * Agrandissement maximal par variante (Dynamic Type / Taille du texte) : le
+ * texte courant suit les tailles d'accessibilité, les grands titres sont
+ * bornés pour rester dans l'écran.
+ */
+const MAX_SCALE: Record<TypographyVariant, number> = {
+  display: 1.3,
+  title: 1.5,
+  number: 1.4,
+  heading: 2,
+  body: 2.2,
+  bodyStrong: 2.2,
+  small: 2.2,
+  caption: 2.2,
+  overline: 2,
+};
+
 export function AppText({ variant = 'body', tone = 'default', align, color, style, ...rest }: AppTextProps) {
   const { colors } = useTheme();
   const toneColor: Record<TextTone, string> = {
@@ -26,5 +43,5 @@ export function AppText({ variant = 'body', tone = 'default', align, color, styl
     solo: colors.solo,
     onAccent: colors.onAccent,
   };
-  return <Text maxFontSizeMultiplier={1.6} {...rest} style={[typography[variant], { color: color ?? toneColor[tone], textAlign: align }, style]} />;
+  return <Text maxFontSizeMultiplier={MAX_SCALE[variant]} {...rest} style={[typography[variant], { color: color ?? toneColor[tone], textAlign: align }, style]} />;
 }

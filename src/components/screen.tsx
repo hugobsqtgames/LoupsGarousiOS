@@ -20,6 +20,8 @@ interface ScreenProps {
   footer?: ReactNode;
   scroll?: boolean;
   mood?: SkyMood;
+  /** Largeur étendue (deux colonnes sur iPad / en paysage). */
+  wide?: boolean;
   testID?: string;
 }
 
@@ -27,12 +29,14 @@ interface ScreenProps {
  * Gabarit commun : décor nocturne, en-tête, zones de sécurité (encoche,
  * Dynamic Island, indicateur d'accueil) et évitement du clavier.
  */
-export function Screen({ title, overline, subtitle, children, back, right, footer, scroll = true, mood = 'night', testID }: ScreenProps) {
+export function Screen({ title, overline, subtitle, children, back, right, footer, scroll = true, mood = 'night', wide = false, testID }: ScreenProps) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const sides = { paddingLeft: Math.max(insets.left, spacing.lg), paddingRight: Math.max(insets.right, spacing.lg) };
+  const width = wide ? styles.wide : null;
   const onBack = typeof back === 'function' ? back : () => (router.canGoBack() ? router.back() : router.replace('/'));
   const header = (
-    <View style={[styles.header, { paddingTop: insets.top + spacing.sm }, title ? styles.headerWithTitle : null]}>
+    <View style={[styles.header, sides, { paddingTop: insets.top + spacing.sm }, title ? styles.headerWithTitle : null]}>
       <NightSky mood={mood} />
       <View style={styles.headerRow}>
         {back ? <IconButton icon="chevron-left" label="Retour" onPress={onBack} testID="back-button" /> : <View style={styles.headerSpacer} />}
@@ -65,12 +69,12 @@ export function Screen({ title, overline, subtitle, children, back, right, foote
       showsVerticalScrollIndicator={false}
     >
       {header}
-      <View style={styles.inner}>{children}</View>
+      <View style={[styles.inner, sides, width]}>{children}</View>
     </ScrollView>
   ) : (
     <View style={styles.flex}>
       {header}
-      <View style={[styles.inner, styles.flex, styles.content]}>{children}</View>
+      <View style={[styles.inner, sides, width, styles.flex, styles.content]}>{children}</View>
     </View>
   );
   return (
@@ -78,7 +82,9 @@ export function Screen({ title, overline, subtitle, children, back, right, foote
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {body}
         {footer ? (
-          <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md, borderTopColor: colors.border, backgroundColor: colors.background }]}>{footer}</View>
+          <View style={[styles.footer, sides, { paddingBottom: insets.bottom + spacing.md, borderTopColor: colors.border, backgroundColor: colors.background }]}>
+            <View style={[styles.footerInner, width]}>{footer}</View>
+          </View>
         ) : null}
       </KeyboardAvoidingView>
     </View>
@@ -95,6 +101,8 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', gap: spacing.sm },
   titleBlock: { gap: spacing.xs, paddingTop: spacing.lg },
   content: { flexGrow: 1 },
-  inner: { paddingHorizontal: spacing.lg, gap: spacing.md, width: '100%', maxWidth: 640, alignSelf: 'center' },
+  inner: { gap: spacing.md, width: '100%', maxWidth: 680, alignSelf: 'center' },
+  wide: { maxWidth: 1180 },
+  footerInner: { gap: spacing.sm, width: '100%', maxWidth: 680, alignSelf: 'center' },
   footer: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, borderTopWidth: StyleSheet.hairlineWidth, gap: spacing.sm },
 });

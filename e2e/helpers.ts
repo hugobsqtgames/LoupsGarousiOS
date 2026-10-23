@@ -30,7 +30,7 @@ export async function openApp(page: Page) {
 }
 
 /** Crée une partie avec attribution manuelle des cartes (déterministe). */
-export async function createManualGame(page: Page, players: [string, string][], opts: { name?: string } = {}) {
+export async function createManualGame(page: Page, players: [string, string][], opts: { name?: string; toggles?: string[] } = {}) {
   await tap(page, 'new-game');
   for (const [name] of players) {
     await id(page, 'player-name-input').fill(name);
@@ -51,6 +51,10 @@ export async function createManualGame(page: Page, players: [string, string][], 
     await page.waitForTimeout(150);
   }
   await tap(page, 'next-step');
+  for (const t of opts.toggles ?? []) {
+    await id(page, `variant-${t}-toggle`).click();
+    await page.waitForTimeout(150);
+  }
   await tap(page, 'next-step');
   if (opts.name) await id(page, 'game-name').fill(opts.name);
   await expect(id(page, 'issues-ok').or(id(page, 'issues-panel'))).toBeVisible();

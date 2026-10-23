@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, View, AccessibilityInfo } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/theme-context';
 import { radius, spacing } from '@/theme/themes';
@@ -50,6 +50,7 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
   const toast = useCallback((message: string, kind: ToastKind = 'success') => {
     if (timer.current) clearTimeout(timer.current);
     setToast({ message, kind, id: Date.now() });
+    AccessibilityInfo.announceForAccessibility(message);
     timer.current = setTimeout(() => setToast(null), kind === 'error' ? 4200 : 2200);
   }, []);
   const api = useMemo(() => ({ confirm, alert, toast }), [confirm, alert, toast]);

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/theme/theme-context';
 import { radius, spacing } from '@/theme/themes';
 import { IconButton } from './button';
@@ -10,8 +11,9 @@ import { AppText } from './text';
 export function Sheet({ visible, title, subtitle, onClose, children, footer, testID }: { visible: boolean; title: string; subtitle?: string; onClose: () => void; children: ReactNode; footer?: ReactNode; testID?: string }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const reduceMotion = useReduceMotion();
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+    <Modal visible={visible} transparent animationType={reduceMotion ? "none" : "slide"} onRequestClose={onClose} statusBarTranslucent>
       <View style={[styles.backdrop, { backgroundColor: colors.overlay }]}>
         <Pressable style={styles.dismiss} onPress={onClose} accessibilityRole="button" accessibilityLabel="Fermer" />
         <View style={[styles.sheet, { backgroundColor: colors.surfaceRaised, borderColor: colors.borderStrong, paddingBottom: insets.bottom + spacing.md }]} testID={testID} accessibilityViewIsModal>

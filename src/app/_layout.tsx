@@ -74,7 +74,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.flex}>
       <SafeAreaProvider>
-        <ThemeProvider themeId={settings.themeId} discreet={settings.discreetMode}>
+        <ThemeProvider themeId={settings.themeId} discreet={settings.discreetMode} highContrast={settings.highContrast}>
           <AudioProvider backend={expoAudioBackend}>
             <FeedbackProvider>
               {!ready ? null : status === 'error' ? <StartupError message={error ?? ''} onRetry={() => void init()} /> : <Navigator />}

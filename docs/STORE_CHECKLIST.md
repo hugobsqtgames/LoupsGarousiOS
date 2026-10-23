@@ -20,3 +20,10 @@ L’application **n’est pas prête à être publiée** tant que les points sui
 - Classement d’âge.
 - Propriété intellectuelle : *Les Loups-garous de Thiercelieux* est une marque déposée ; ne pas utiliser le nom ni les visuels officiels dans la fiche sans autorisation (l’app ne contient ni illustrations ni textes du livret).
 - Version / numéro de build gérés par EAS (`autoIncrement`).
+
+## Ajouts (iPad, partage)
+
+- [ ] Captures iPad 13 pouces (2064 × 2752 ou 2752 × 2064) : obligatoires dès que `supportsTablet` est actif.
+- [ ] Vérifier sur iPad réel : rotation, Split View, Slide Over, clavier externe.
+- [ ] Vérifier le partage de l’image récapitulative (feuille de partage iOS) et la vignette dans Messages.
+- [ ] VoiceOver et Taille du texte maximale sur iPhone réel (les tests automatisés ne remplacent pas une écoute réelle).

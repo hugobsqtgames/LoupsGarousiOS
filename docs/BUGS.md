@@ -22,6 +22,11 @@
 | 16 | Manifeste de confidentialité iOS sans les API à justification | inspection du projet natif généré | déclarations ajoutées dans `app.json` | prebuild |
 | 17 | Tests d’intégration bloqués ou instables (événements RNTL v14 non attendus, minuteurs simulés, `waitFor` asynchrone) | exécutions répétées | événements attendus, horloge simulée avancée explicitement | 12 exécutions consécutives stables |
 
+| 18 | Six écarts avec les livrets officiels (Petite Fille protégée par le Salvateur, Ancien infectable, Chevalier et Grand Méchant Loup, Idiot maire, Servante, Ange amoureux) | lecture des livrets officiels | règles corrigées (voir `RULES.md`) | `official-rules.test.ts` |
+| 19 | Loup-Garou blanc en variante « nuits impaires » : jamais appelé la nuit 1 | test de la variante | condition « attendre une nuit » réservée à la reprise par la Servante | `official-rules.test.ts` |
+| 20 | Libellé « Dramatique » coupé sur deux lignes dans le sélecteur de style | revue des captures | libellé « Drame » | captures |
+| 21 | Ciels du village virant au magenta dans les illustrations | revue des images | teinte resserrée | planche `docs/illustrations` |
+
 Incident de processus (non applicatif) : la copie initiale du modèle Expo avait remplacé le dossier `.git` du dépôt ; détecté avant tout envoi, la branche demandée a été recréée proprement.
 
 ## Problèmes ouverts et limites connues
@@ -30,13 +35,19 @@ Incident de processus (non applicatif) : la copie initiale du modèle Expo avait
 | --- | --- |
 | Tests natifs iOS (rendu, audio, haptique, SQLite natif, partage) | **non réalisés** : aucun simulateur dans l’environnement |
 | Règles | issues de résumés tiers ; points incertains listés dans `RULES.md` et rendus configurables |
-| Gitane, événements *Nouvelle Lune*, *Le Village*, *Le Pacte* | non implémentés |
-| Comédien | cartes limitées à Voyante, Salvateur, Renard, Corbeau, Sorcière, Simple Villageois |
-| Solitaire personnalisé | pas de condition de victoire propre |
+| *Le Village* (bâtiments), *Le Pacte*, Crieur, variantes 1 à 8 de *Nouvelle Lune* | non implémentés (seuls le Corbeau et le Loup blanc du *Village* sont gérés) |
+| Cartes Événement | effets complexes guidés (rappels + outils MJ), pas automatisés ; catégorie d’effet déduite du texte ; noms français en partie traduits par l’app |
+| Comédien | cartes limitées à Voyante, Salvateur, Renard, Corbeau, Sorcière, Simple Villageois (le livret autorise toute carte à pouvoir non loup) |
+| Servante reprenant Cupidon alors qu’un couple vit | deux couples non gérés : pas de nouveau couple |
+| Parties enregistrées avant la mise à jour des règles | rejouées avec les règles actuelles ; une action devenue impossible est signalée au chargement |
+| Image récapitulative | conversion PNG testée sur le web uniquement ; sur iOS elle repose sur `toDataURL` de react-native-svg (non testé sur appareil) |
+| Glisser-déposer du plan de table, révélation par appui long | testés sur le web (Playwright) ; gestes natifs iOS non testés |
+| Statistiques par joueur | un joueur est reconnu par son nom (pas d’identifiant) ; parties anciennes recalculées à l’ouverture |
+| Intermittent | un test d’intégration (`game-flow`) a échoué une fois sur quatre exécutions complètes de Jest (délai sous charge), sans se reproduire seul ni ensuite |
 | Correction d’une action passée | directe pour les actions à cible unique ; les autres se corrigent par « Revenir ici » puis nouvelle saisie |
 | Ordre de nuit | fixe pour les rôles intégrés (réglable pour les rôles personnalisés) |
 | Deux Sœurs / Trois Frères | réveils ultérieurs facultatifs non guidés |
-| Orientation | portrait uniquement ; iPad non ciblé |
+| iPad / paysage | mise en page testée dans Chromium (1180 × 820) ; pas de test sur iPad réel |
 | Indice d’équilibre | heuristique, non validé statistiquement |
 | Narration | dépend des voix françaises installées sur l’appareil |
 | Couverture des branches des écrans | partielle (surtout testés en E2E) |

@@ -3,7 +3,7 @@
     "name": "Loups-Garous MJ",
     "slug": "loups-garous-mj",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "loupsgarousmj",
     "userInterfaceStyle": "dark",
@@ -11,7 +11,7 @@
     "ios": {
       "bundleIdentifier": "com.hugobsqtgames.loupsgarousmj",
       "buildNumber": "1",
-      "supportsTablet": false,
+      "supportsTablet": true,
       "icon": "./assets/images/icon.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -101,7 +101,8 @@
       ],
       "expo-sharing",
       "expo-font",
-      "expo-asset"
+      "expo-asset",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true,

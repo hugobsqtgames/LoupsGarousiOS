@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/theme/theme-context';
 import { radius, spacing } from '@/theme/themes';
 import { useHaptics } from '@/utils/haptics';
@@ -35,13 +36,14 @@ export function PrivateReveal({
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const haptics = useHaptics();
+  const reduceMotion = useReduceMotion();
   const [shown, setShown] = useState(false);
   const hide = () => {
     setShown(false);
     onDone();
   };
   return (
-    <Modal visible={visible} animationType="fade" onRequestClose={hide} statusBarTranslucent>
+    <Modal visible={visible} animationType={reduceMotion ? 'none' : 'fade'} onRequestClose={hide} statusBarTranslucent>
       <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top + spacing.xl, paddingBottom: insets.bottom + spacing.lg }]} testID={testID} accessibilityViewIsModal>
         {!shown ? (
           <View style={styles.center}>
