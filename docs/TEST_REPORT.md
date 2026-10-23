@@ -10,7 +10,7 @@ Environnement : conteneur Linux (4 cœurs), Node 22.22, Chromium (Playwright 1.5
 | Lint | `expo lint` (règles Expo + React Compiler) | 0 erreur, 0 avertissement |
 | Diagnostic Expo | `expo-doctor` | 20/20 (après `expo install --fix` : 10 correctifs SDK 58) |
 | Unitaires + intégration | Jest (jest-expo) | **24 suites, 204 tests passés**, 0 échec sur l’exécution finale (2 générateurs ignorés hors demande) ; 1 échec intermittent observé sur 4 exécutions (voir BUGS) |
-| Bout en bout | Playwright sur l’export web | @@E2E@@ |
+| Bout en bout | Playwright sur l’export web | **11 tests passés** sur l’exécution finale (partie complète, corrections, hors ligne, 4 parcours des nouveautés, 3 monkey tests de 250 gestes — 89 à 116 contrôles distincts —, mesures) + 5 tests de captures lancés à part (58 captures) ; session longue de **1 000 gestes** (graine 101, 209 contrôles distincts) : 0 erreur JavaScript |
 | Bundle iOS | `expo export -p ios` | compile (bytecode Hermes, 4,9 Mo) — revérifié après les ajouts |
 | Projet natif iOS | `expo prebuild -p ios` (copie temporaire) | généré ; `Info.plist` inspecté |
 
@@ -73,7 +73,7 @@ Migrations (création, idempotence, migration depuis un schéma antérieur avec 
 | `full-game` | création manuelle (5 joueurs), Voyante (résultat), loups, Sorcière, aube, **rechargement de la page en pleine partie** puis reprise depuis l’accueil, maire 3 voix, vote pondéré par le maire, victoire du village, résumé, statistiques, liste des parties, aucune erreur console |
 | `corrections` | Cupidon + Chasseur : **correction de l’étape des loups** via la frise, mort de chagrin, tir obligatoire avant le jour, victoire détectée après le tir, annulation, retour arrière avant la résolution |
 | `offline` | **aucune requête hors de localhost**, puis réseau coupé : création et lancement d’une partie |
-| `monkey` ×3 | graines 11, 23, 37 : 250 gestes chacune (appuis en rafale, saisies aléatoires, retours, rechargements), ~75–87 contrôles distincts ; aucune erreur JS, jamais d’écran durablement vide |
+| `monkey` ×3 | graines 11, 23, 37 : 250 gestes chacune (appuis aux coordonnées comme un doigt, rafales, saisies aléatoires, retours, rechargements), 89 à 116 contrôles distincts ; plus une session de 1 000 gestes (209 contrôles) ; aucune erreur JS, jamais d’écran durablement vide |
 | `features` ×4 | **distribution sur le téléphone** (appui court sans effet, appui long révèle), **Voleur** découvrant les cartes du centre en privé puis revoyant son nouveau rôle ; **mains levées** (pavé, plafond refusé), **minuteur**, annonce, chronologie, **plan de table** (voisins), **rejeu** ; **Nouvelle Lune** (aucun tirage au premier matin, tirage, Pile ou face → grâce) ; **iPad paysage** (deux colonnes vérifiées par position) |
 | `screenshots` + `screenshots-new` | 58 captures réelles (`docs/screenshots/web`), dont iPad 1180 × 820 |
 | `perf` | mesures ci-dessous |
