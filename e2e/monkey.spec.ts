@@ -48,8 +48,14 @@ for (const seed of SEEDS) {
     await openApp(page);
     await seedGame(page);
     for (let step = 0; step < STEPS; step++) {
+      const t0 = Date.now();
+      let what = '';
       const r = random();
-      if (r < 0.04) await page.goBack().catch(() => undefined);
+      if (r < 0.04) {
+        await page.goBack().catch(() => undefined);
+        // Retour depuis la toute première page : le navigateur revient à about:blank (avant l'app).
+        if (page.url() === 'about:blank') await page.goto('/');
+      }
       else if (r < 0.06) await page.goto('/');
       else {
         const inputs = page.locator('input:visible, textarea:visible');
@@ -64,16 +70,21 @@ for (const seed of SEEDS) {
           const el = candidates.nth(Math.floor(random() * n));
           const tid = (await el.getAttribute('data-testid').catch(() => null)) ?? (await el.getAttribute('aria-label').catch(() => null)) ?? '?';
           clicked.add(tid);
-          await el.click({ timeout: 2000, trial: false }).catch(() => undefined);
+          what = tid;
+          // Appui aux coordonnées de l'élément, comme un doigt : si une feuille ou un
+          // dialogue le recouvre, c'est l'élément du dessus qui reçoit l'appui.
+          const box = await el.boundingBox().catch(() => null);
+          if (box) await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2).catch(() => undefined);
         }
       }
       // Laisse parfois passer le délai anti-double-appui, parfois non (appuis en rafale).
       await page.waitForTimeout(random() < 0.5 ? 30 : 480);
       // Un rechargement affiche brièvement un écran vide (chargement) : seul un écran durablement vide est une erreur.
       await expect
-        .poll(async () => (await page.locator('body').innerText().catch(() => '')).trim().length, { message: `écran vide à l’étape ${step} (graine ${seed})`, timeout: 5000 })
+        .poll(async () => (await page.locator('body').innerText().catch(() => '')).trim().length, { message: `écran vide à l’étape ${step} (graine ${seed}) sur ${page.url()} après « ${what} »`, timeout: 5000 })
         .toBeGreaterThan(0);
       expect(errors, `erreur JavaScript à l’étape ${step} (graine ${seed})`).toEqual([]);
+      if (process.env.MONKEY_DEBUG && Date.now() - t0 > 1500) console.log(`lent : étape ${step} ${Date.now() - t0} ms ${what} ${page.url()}`);
     }
     test.info().annotations.push({ type: 'couverture', description: `${clicked.size} contrôles distincts touchés` });
     console.log(`graine ${seed} : ${STEPS} gestes, ${clicked.size} contrôles distincts`);
