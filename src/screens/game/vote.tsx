@@ -7,6 +7,7 @@ import {
   countBallot,
   describeOutcome,
   eligibleVoters,
+  eventActive,
   leadersOf,
   loverOf,
   nameOf,
@@ -193,6 +194,8 @@ function TallyBoard({ state, ballot }: { state: GameState; ballot: Ballot }) {
   const haptics = useHaptics();
   const { colors } = useTheme();
   const [mayorSheet, setMayorSheet] = useState(false);
+  const [handsMode, setHandsMode] = useState(false);
+  const [handsFor, setHandsFor] = useState<PlayerId | 'blank' | null>(null);
   const count = countBallot(ballot);
   const tallies = talliesWithBonus(ballot);
   const { leaders } = leadersOf(tallies);
@@ -211,9 +214,25 @@ function TallyBoard({ state, ballot }: { state: GameState; ballot: Ballot }) {
   const remove = (target: PlayerId | 'blank') => {
     if (act({ type: 'ballot/unvote', target })) audio.play('undo');
   };
+  const tapRow = (target: PlayerId | 'blank') => (handsMode ? setHandsFor(target) : add(target));
+  const otherAnonymous = handsFor ? anonymousCast - (count.anonymous[handsFor] ?? 0) : 0;
 
   return (
     <View style={styles.gap}>
+      <Segmented<'tap' | 'hands'>
+        value={handsMode ? 'hands' : 'tap'}
+        onChange={(v) => setHandsMode(v === 'hands')}
+        options={[
+          { value: 'tap', label: '+1 par appui' },
+          { value: 'hands', label: 'Nombre de mains' },
+        ]}
+        testID="tally-input-mode"
+      />
+      {handsMode ? (
+        <AppText variant="caption" tone="muted">
+          Touchez un joueur et saisissez le nombre de mains levées : l’application enregistre les voix une par une (traçables et annulables).
+        </AppText>
+      ) : null}
       {ballot.candidates.map((id) => {
         const p = state.players.find((x) => x.id === id)!;
         const anon = count.anonymous[id] ?? 0;
@@ -225,7 +244,7 @@ function TallyBoard({ state, ballot }: { state: GameState; ballot: Ballot }) {
         if (mayorChoice === id) extra.push(`+${state.setup.variants.mayorVoteWeight} maire`);
         return (
           <View key={id} style={[styles.voteRow, { backgroundColor: colors.surface, borderColor: tie ? colors.warning : isLeader ? colors.accent : colors.border }]} testID={`vote-row-${id}`}>
-            <Pressable style={styles.voteMain} onPress={() => add(id)} disabled={full} accessibilityRole="button" accessibilityLabel={`Ajouter une voix pour ${p.name}, ${value} voix`} testID={`vote-tap-${id}`}>
+            <Pressable style={styles.voteMain} onPress={() => tapRow(id)} disabled={full && !handsMode} accessibilityRole="button" accessibilityLabel={handsMode ? `Saisir le nombre de mains levées pour ${p.name}, ${anon} actuellement` : `Ajouter une voix pour ${p.name}, ${value} voix`} testID={`vote-tap-${id}`}>
               <PlayerAvatar name={p.name} mayor={state.mayorId === id} size={40} />
               <View style={styles.flex}>
                 <AppText variant="bodyStrong" numberOfLines={1}>
@@ -246,7 +265,7 @@ function TallyBoard({ state, ballot }: { state: GameState; ballot: Ballot }) {
       })}
       {state.setup.variants.allowBlankVotes ? (
         <View style={[styles.voteRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.voteMain}>
+          <Pressable style={styles.voteMain} onPress={() => handsMode && setHandsFor('blank')} disabled={!handsMode} accessibilityRole="button" accessibilityLabel="Votes blancs" testID="blank-row">
             <Icon name="x" color={colors.textMuted} />
             <AppText variant="bodyStrong" style={styles.flex}>
               Votes blancs
@@ -254,7 +273,7 @@ function TallyBoard({ state, ballot }: { state: GameState; ballot: Ballot }) {
             <AppText variant="number" style={styles.voteCount} testID="blank-count">
               {count.anonymous.blank ?? 0}
             </AppText>
-          </View>
+          </Pressable>
           <CountButton icon="minus" label="Retirer un vote blanc" onPress={() => remove('blank')} disabled={(count.anonymous.blank ?? 0) === 0} testID="blank-minus" />
           <CountButton icon="plus" label="Ajouter un vote blanc" onPress={() => add('blank')} disabled={full} testID="blank-plus" />
         </View>
@@ -278,6 +297,20 @@ function TallyBoard({ state, ballot }: { state: GameState; ballot: Ballot }) {
           </View>
         </Panel>
       ) : null}
+      <HandsSheet
+        target={handsFor}
+        name={handsFor === 'blank' ? 'Votes blancs' : handsFor ? nameOf(state, handsFor) : ''}
+        current={handsFor ? (count.anonymous[handsFor] ?? 0) : 0}
+        max={state.setup.variants.strictVoterCount ? capacity - otherAnonymous : 99}
+        onClose={() => setHandsFor(null)}
+        onSubmit={(n) => {
+          if (handsFor && act({ type: 'ballot/set-count', target: handsFor, count: n })) {
+            audio.play('vote');
+            haptics.tap();
+            setHandsFor(null);
+          }
+        }}
+      />
       <Sheet visible={mayorSheet} title="Vote du maire" onClose={() => setMayorSheet(false)}
         footer={mayorChoice ? <Button label="Retirer le vote du maire" variant="quiet" icon="minus" onPress={() => { if (act({ type: 'ballot/unvote', target: mayorChoice, voterId: state.mayorId })) setMayorSheet(false); }} /> : undefined}
       >
@@ -294,6 +327,61 @@ function TallyBoard({ state, ballot }: { state: GameState; ballot: Ballot }) {
         />
       </Sheet>
     </View>
+  );
+}
+
+/** Pavé numérique : nombre de mains levées pour une cible (borné au nombre de votants restant). */
+function HandsSheet({ target, name, current, max, onClose, onSubmit }: { target: string | null; name: string; current: number; max: number; onClose: () => void; onSubmit: (n: number) => void }) {
+  const [digits, setDigits] = useState('');
+  const value = digits === '' ? current : Number(digits);
+  const tooMany = value > max;
+  const press = (d: string) => setDigits((x) => (x.length >= 2 ? x : x === '0' ? d : x + d));
+  const close = () => {
+    setDigits('');
+    onClose();
+  };
+  return (
+    <Sheet
+      visible={target !== null}
+      title={`Mains levées : ${name}`}
+      subtitle={`Actuellement ${current} · au plus ${Math.max(0, max)}`}
+      onClose={close}
+      footer={
+        <Button
+          label={`Enregistrer ${value} voix`}
+          icon="check"
+          disabled={tooMany}
+          onPress={() => {
+            onSubmit(value);
+            setDigits('');
+          }}
+          testID="hands-submit"
+        />
+      }
+    >
+      <AppText variant="display" align="center" tone={tooMany ? 'danger' : 'default'} testID="hands-value" accessibilityLiveRegion="polite">
+        {value}
+      </AppText>
+      {tooMany ? (
+        <AppText variant="small" tone="danger" align="center">
+          Plus de mains que de votants restants.
+        </AppText>
+      ) : null}
+      <View style={styles.keypad}>
+        {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map((k) => (
+          <Button
+            key={k}
+            label={k}
+            variant={k === 'C' || k === '⌫' ? 'quiet' : 'secondary'}
+            size="lg"
+            onPress={() => (k === 'C' ? setDigits('0') : k === '⌫' ? setDigits((x) => x.slice(0, -1)) : press(k))}
+            accessibilityHint={k === 'C' ? 'Remettre à zéro' : k === '⌫' ? 'Effacer le dernier chiffre' : undefined}
+            style={styles.key}
+            testID={`key-${k === '⌫' ? 'back' : k}`}
+          />
+        ))}
+      </View>
+    </Sheet>
   );
 }
 
@@ -393,6 +481,8 @@ function NominalBoard({ state, ballot }: { state: GameState; ballot: Ballot }) {
 function ClosedBallot({ state, ballot }: { state: GameState; ballot: Ballot }) {
   const act = useGameAction();
   const { confirm } = useFeedback();
+  const [coin, setCoin] = useState<'pile' | 'face' | null>(null);
+  const canSpare = ballot.result?.outcome.kind === 'eliminated' && eventActive(state, 'spare');
   const result = ballot.result!;
   const sorted = Object.entries(result.tallies).sort((a, b) => b[1] - a[1]);
   const o = result.outcome;
@@ -425,6 +515,31 @@ function ClosedBallot({ state, ballot }: { state: GameState; ballot: Ballot }) {
         }}
         testID="confirm-ballot"
       />
+      {canSpare && o.kind === 'eliminated' ? (
+        <Panel tone="warning" overline="Événement : grâce possible" testID="spare-panel">
+          <AppText variant="small" tone="muted">
+            Pile ou face (pile = gracié) ou pacte avec le diable : le condamné peut être épargné. Le vote du jour compte comme effectué.
+          </AppText>
+          <View style={styles.row}>
+            <Button label="Lancer la pièce" icon="dice" variant="secondary" onPress={() => setCoin(Math.random() < 0.5 ? 'pile' : 'face')} style={styles.flex} testID="coin-flip" />
+            <Button
+              label="Gracier"
+              icon="heart"
+              variant="secondary"
+              onPress={async () => {
+                if (await confirm({ title: `Gracier ${nameOf(state, o.playerId)} ?`, message: 'Le condamné reste en jeu.', confirmLabel: 'Gracier' })) act({ type: 'ballot/confirm', spared: true }, { sound: 'confirm' });
+              }}
+              style={styles.flex}
+              testID="spare-ballot"
+            />
+          </View>
+          {coin ? (
+            <AppText variant="title" align="center" testID="coin-result">
+              {coin === 'pile' ? 'Pile : le condamné est gracié' : 'Face : le condamné est éliminé'}
+            </AppText>
+          ) : null}
+        </Panel>
+      ) : null}
       <View style={styles.row}>
         <Button label="Rouvrir pour corriger" icon="edit" variant="secondary" onPress={() => act({ type: 'ballot/reopen' })} style={styles.flex} testID="reopen-ballot" />
         <Button
@@ -548,4 +663,6 @@ const styles = StyleSheet.create({
   resultRow: { flexDirection: 'row', paddingVertical: 2 },
   live: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md },
   liveLead: { flexShrink: 1, textAlign: 'right' },
+  keypad: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' },
+  key: { flexBasis: '30%', flexGrow: 1 },
 });

@@ -13,6 +13,8 @@ import { useRoleRegistry } from '@/hooks/use-roles';
 import { applyAutoComposition, cardCount, defaultComedianCards, rolesFromCounts } from '@/state/draft';
 import { useDraftStore } from '@/state/draft-store';
 import { useAppStore } from '@/state/app-store';
+import { balanceSamples } from '@/state/stats';
+import { learnBalance } from '@/engine';
 import { useTheme } from '@/theme/theme-context';
 import { spacing, teamColor } from '@/theme/themes';
 
@@ -57,6 +59,8 @@ export function StepRoles() {
   const update = useDraftStore((s) => s.update);
   const favorites = useAppStore((s) => s.settings.favoriteRoles);
   const { all, registry } = useRoleRegistry();
+  const games = useAppStore((s) => s.games);
+  const learned = useMemo(() => learnBalance(balanceSamples(games)), [games]);
   const { colors } = useTheme();
   const [filter, setFilter] = useState<Expansion | 'all'>('all');
   const [cardSheet, setCardSheet] = useState<{ kind: 'thief' | 'comedian'; index: number } | null>(null);
@@ -131,11 +135,22 @@ export function StepRoles() {
           })}
         </View>
         <ToggleRow label="Autoriser un rôle solitaire" help="Joueur de flûte ou Ange (10 joueurs et plus)." value={draft.allowSolo} onChange={(allowSolo) => update({ allowSolo })} />
+        <ToggleRow
+          label="Équilibrer selon mes parties"
+          help={
+            learned.sampleSize < 3
+              ? `Disponible après 3 parties terminées (${learned.sampleSize} pour l’instant).`
+              : `D’après ${learned.sampleSize} partie(s) terminée(s)${learned.details.length ? ` : ${learned.details.slice(0, 3).map((x) => `${registry.has(x.roleId) ? registry.get(x.roleId).name : x.roleId} ${x.delta > 0 ? '+' : ''}${x.delta}`).join(', ')}` : ' : aucun écart notable'}. Calcul local, rien ne quitte l’appareil.`
+          }
+          value={draft.learnFromHistory !== false}
+          onChange={(learnFromHistory) => update({ learnFromHistory })}
+          testID="learn-balance"
+        />
         <Button
           label={n < 5 ? 'Ajoutez au moins 5 joueurs' : 'Générer une composition'}
           icon="dice"
           disabled={n < 5 || !draft.expansions.includes('base')}
-          onPress={() => update((d) => applyAutoComposition({ ...d, seed: (d.seed * 31 + 7) % 1_000_003 }))}
+          onPress={() => update((d) => applyAutoComposition({ ...d, seed: (d.seed * 31 + 7) % 1_000_003 }, learned.adjustments))}
           testID="auto-compose"
         />
         {!draft.expansions.includes('base') ? (

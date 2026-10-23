@@ -39,7 +39,7 @@ function setup(over: Partial<AudioPrefs> = {}, opts: { failSource?: string } = {
     stopSpeech: () => undefined,
   };
   const prefs: AudioPrefs = { muted: false, discreet: false, ambientVolume: 0.5, effectsVolume: 0.7, narrationEnabled: true, narrationVolume: 0.8, playInSilentMode: false, ...over };
-  const m = new AudioManager(backend, { ambients: { night: 'night', day: 'day' }, effects: { nightfall: 'nf', daybreak: 'db', confirm: 'c', vote: 'v', undo: 'u', alert: 'a', step: 's', victory: 'w' } }, prefs);
+  const m = new AudioManager(backend, { ambients: { night: 'night', day: 'day', rain: 'rain', storm: 'storm' }, effects: { nightfall: 'nf', daybreak: 'db', confirm: 'c', vote: 'v', undo: 'u', alert: 'a', step: 's', victory: 'w', howl: 'h', bell: 'b', timer: 't' } }, prefs);
   return { m, players, spoken, modes, prefs };
 }
 
@@ -122,5 +122,15 @@ describe('AudioManager', () => {
     m.playEffect('vote');
     m.dispose();
     expect(players.every((p) => p.removed)).toBe(true);
+  });
+});
+
+describe('ambiances supplémentaires', () => {
+  it('passe de la pluie à l’orage sans superposer deux ambiances', () => {
+    const { m, players } = setup();
+    m.setScene('rain');
+    m.setScene('storm');
+    const playing = players.filter((p) => p.playing);
+    expect(playing.map((p) => p.source)).toEqual(['storm']);
   });
 });

@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { DEATH_CAUSE_LABELS, describeEntry, TEAM_LABELS, WINNER_LABELS } from '@/engine';
 import { Button } from '@/components/button';
+import { RecapShareButton } from '@/components/recap-share';
 import { PlayerAvatar, RoleMedallion } from '@/components/game-ui';
 import { Chip, Panel, SectionTitle } from '@/components/panel';
 import { Screen } from '@/components/screen';
@@ -27,6 +28,20 @@ export function SummaryScreen() {
   const v = state.victory;
   const winners = new Set(v?.winners ?? []);
   const keyEvents = state.log.filter((e) => KEY_EVENTS.has(e.event.type));
+
+  const recap = {
+    title: state.setup.name,
+    winnerLabel: v ? WINNER_LABELS[v.winner] : 'Partie en cours',
+    reason: v?.reason ?? '',
+    nights: state.nightNumber,
+    days: state.dayNumber,
+    date: state.setup.createdAt.slice(0, 10).split('-').reverse().join('/'),
+    players: state.players.map((p) => {
+      const role = registry.has(p.roleId) ? registry.get(p.roleId) : null;
+      return { name: p.name, roleName: role?.name ?? p.roleId, glyph: role?.icon ?? 'custom', team: p.team, alive: p.alive, winner: winners.has(p.id) };
+    }),
+    moments: keyEvents.filter((e) => !['lovers', 'transformed', 'infected', 'servant'].includes(e.event.type) || state.phase.kind === 'ended').map((e) => `${e.phaseLabel} : ${describeEntry(state, e)}`),
+  };
 
   const replaySame = async (edit: boolean) => {
     const draft = draftFromSetup(state.setup);
@@ -101,6 +116,9 @@ export function SummaryScreen() {
         ))}
       </Panel>
 
+      {state.phase.kind === 'ended' ? <RecapShareButton data={recap} fileName={`recap-${state.setup.id}.png`} /> : null}
+      <Button label="Revoir la partie pas à pas" icon="replay" variant="secondary" onPress={() => router.push({ pathname: '/game/[id]/replay', params: { id: state.setup.id } })} testID="open-replay" />
+      <Button label="Chronologie" icon="timeline" variant="secondary" onPress={() => router.push({ pathname: '/game/[id]/timeline', params: { id: state.setup.id } })} testID="summary-timeline" />
       <Button label="Rejouer avec la même composition" icon="refresh" onPress={() => void replaySame(false)} testID="replay-same" />
       <Button label="Modifier la configuration" icon="edit" variant="secondary" onPress={() => void replaySame(true)} testID="replay-edit" />
       <Button label="Historique complet" icon="history" variant="quiet" onPress={() => router.push({ pathname: '/game/[id]/history', params: { id: state.setup.id } })} />

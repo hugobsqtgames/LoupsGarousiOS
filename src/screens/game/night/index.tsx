@@ -1,7 +1,9 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { computeNightSteps, nameOf, phaseLabel, STEP_TITLES, type NightStep, type StepPayload } from '@/engine';
+import { computeNightSteps, nameOf, phaseLabel, reminders, STEP_TITLES, type NightStep, type StepPayload } from '@/engine';
+import { RemindersPanel } from '@/components/reminders';
+import { useAppStore } from '@/state/app-store';
 import { useAudio } from '@/audio/audio-context';
 import { Button, IconButton } from '@/components/button';
 import { useFeedback } from '@/components/feedback';
@@ -100,13 +102,14 @@ export function NightScreen() {
   const setValue = (v: StepPayload) => viewed && setDrafts((d) => ({ ...d, [viewed.key]: v }));
   const showActors = viewed ? (actorsShown[viewed.key] ?? !hide) : false;
   const lastNarrated = useRef<string | null>(null);
+  const wolfHowl = useAppStore((s) => s.settings.wolfHowl);
 
   useEffect(() => {
     if (!viewed || viewKey || lastNarrated.current === viewed.key) return;
     lastNarrated.current = viewed.key;
-    audio.play('step');
+    audio.play(viewed.kind === 'wolves' && wolfHowl ? 'howl' : 'step');
     audio.narrate(wakeScript(viewed, registry));
-  }, [viewed, viewKey, audio, registry]);
+  }, [viewed, viewKey, audio, registry, wolfHowl]);
 
   if (state.phase.kind !== 'night') {
     return (
@@ -197,6 +200,7 @@ export function NightScreen() {
               </Pressable>
             ) : null}
           </Panel>
+          <RemindersPanel items={reminders(state, viewed)} testID="step-reminders" />
           <StepForm state={state} step={viewed} value={value} onChange={setValue} />
         </>
       ) : (

@@ -6,6 +6,7 @@ import { useAudio } from '@/audio/audio-context';
 import { Button } from '@/components/button';
 import { AppText } from '@/components/text';
 import { useAppStore } from '@/state/app-store';
+import { resolveNightAmbience } from '@/settings/settings';
 import { useGameStore } from '@/state/game-store';
 import { useTheme } from '@/theme/theme-context';
 import { spacing } from '@/theme/themes';
@@ -20,6 +21,9 @@ export default function GameLayout() {
   const loadError = useGameStore((s) => s.loadError);
   const phaseKind = useGameStore((s) => s.state?.phase.kind);
   const keepAwake = useAppStore((s) => s.settings.keepAwake);
+  const nightScene = useAppStore((s) => resolveNightAmbience(s.settings));
+  const dayAmbience = useAppStore((s) => s.settings.dayAmbience);
+  const dawnBell = useAppStore((s) => s.settings.dawnBell);
   const audio = useAudio();
   const prevPhase = useRef<string | undefined>(undefined);
 
@@ -37,14 +41,14 @@ export default function GameLayout() {
 
   useEffect(() => {
     if (!phaseKind) return;
-    audio.setScene(phaseKind === 'night' || phaseKind === 'dawn' ? 'night' : phaseKind === 'day' ? 'day' : 'none');
+    audio.setScene(phaseKind === 'night' || phaseKind === 'dawn' ? nightScene : phaseKind === 'day' && dayAmbience ? 'day' : 'none');
     if (prevPhase.current && prevPhase.current !== phaseKind) {
       if (phaseKind === 'night') audio.play('nightfall');
-      else if (phaseKind === 'dawn') audio.play('daybreak');
+      else if (phaseKind === 'dawn') audio.play(dawnBell ? 'bell' : 'daybreak');
       else if (phaseKind === 'ended') audio.play('victory');
     }
     prevPhase.current = phaseKind;
-  }, [phaseKind, audio]);
+  }, [phaseKind, audio, nightScene, dayAmbience, dawnBell]);
 
   useEffect(() => () => audio.setScene('none'), [audio]);
 

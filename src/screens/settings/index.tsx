@@ -3,17 +3,19 @@ import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useAudio } from '@/audio/audio-context';
 import { Button } from '@/components/button';
-import { ToggleRow, VolumeControl } from '@/components/controls';
+import { Segmented, Stepper, ToggleRow, VolumeControl } from '@/components/controls';
 import { useFeedback } from '@/components/feedback';
 import { Icon } from '@/components/icon';
 import { ListRow } from '@/components/list-row';
 import { Panel, SectionTitle } from '@/components/panel';
 import { Screen } from '@/components/screen';
 import { AppText } from '@/components/text';
-import { THEME_IDS, type ThemeId } from '@/settings/settings';
+import { THEME_IDS, THEME_NIGHT_AMBIENCE, type AnnouncementStyleSetting, type NightAmbience, type ThemeId } from '@/settings/settings';
 import { useAppStore } from '@/state/app-store';
 import { useTheme } from '@/theme/theme-context';
 import { radius, spacing, THEMES } from '@/theme/themes';
+
+const AMBIENCE_LABELS: Record<Exclude<NightAmbience, 'auto'>, string> = { night: 'vent et grillons', rain: 'pluie', storm: 'orage' };
 
 function ThemeCard({ id, active, onPress }: { id: ThemeId; active: boolean; onPress: () => void }) {
   const t = THEMES[id];
@@ -111,9 +113,29 @@ export function SettingsScreen() {
           testID="narration-toggle"
         />
         <VolumeControl label="Volume de la narration" value={settings.narrationVolume} onChange={(narrationVolume) => void set({ narrationVolume })} disabled={soundOff || !settings.narrationEnabled} testID="vol-narration" />
+        <AppText variant="bodyStrong">Ambiance de la nuit</AppText>
+        <Segmented<NightAmbience>
+          value={settings.nightAmbience}
+          onChange={(nightAmbience) => void set({ nightAmbience })}
+          options={[
+            { value: 'auto', label: 'Thème' },
+            { value: 'night', label: 'Vent' },
+            { value: 'rain', label: 'Pluie' },
+            { value: 'storm', label: 'Orage' },
+          ]}
+          testID="night-ambience"
+        />
+        <AppText variant="caption" tone="faint">
+          « Thème » : {AMBIENCE_LABELS[THEME_NIGHT_AMBIENCE[settings.themeId]]} avec le thème actuel.
+        </AppText>
+        <ToggleRow label="Ambiance du village le jour" help="Oiseaux et brise pendant le débat." value={settings.dayAmbience} onChange={(dayAmbience) => void set({ dayAmbience })} disabled={soundOff} />
+        <ToggleRow label="Hurlement au réveil des loups" value={settings.wolfHowl} onChange={(wolfHowl) => void set({ wolfHowl })} disabled={soundOff} testID="howl-toggle" />
+        <ToggleRow label="Cloche du village à l’aube" help="Remplace le carillon du lever du jour." value={settings.dawnBell} onChange={(dawnBell) => void set({ dawnBell })} disabled={soundOff} />
         <ToggleRow label="Jouer en mode silencieux" help="Par défaut, l’interrupteur silencieux de l’iPhone coupe les sons." value={settings.playInSilentMode} onChange={(playInSilentMode) => void set({ playInSilentMode })} />
         <View style={styles.inline}>
           <Button label="Tester un effet" icon="volume" size="sm" variant="secondary" onPress={() => audio.play('daybreak')} disabled={soundOff} />
+          <Button label="Hurlement" icon="wolf" size="sm" variant="secondary" onPress={() => audio.play('howl')} disabled={soundOff} />
+          <Button label="Cloche" icon="sunrise" size="sm" variant="secondary" onPress={() => audio.play('bell')} disabled={soundOff} />
           <Button label="Tester la voix" icon="play" size="sm" variant="secondary" onPress={() => audio.narrate('Le village s’endort. Loups-Garous, réveillez-vous.')} disabled={soundOff || !settings.narrationEnabled} />
         </View>
         {audio.lastError() ? (
@@ -128,6 +150,29 @@ export function SettingsScreen() {
         <ToggleRow label="Masquer les rôles par défaut" help="Les rôles restent cachés dans les vues générales ; maintenez l’appui pour les lire." value={settings.hideSecretsByDefault} onChange={(hideSecretsByDefault) => void set({ hideSecretsByDefault })} />
         <ToggleRow label="Retour haptique" value={settings.haptics} onChange={(haptics) => void set({ haptics })} />
         <ToggleRow label="Garder l’écran allumé" help="Pendant une partie uniquement." value={settings.keepAwake} onChange={(keepAwake) => void set({ keepAwake })} />
+        <Stepper label={settings.debateMinutes === 0 ? 'Minuteur de débat : désactivé' : `Minuteur de débat : ${settings.debateMinutes} min`} value={settings.debateMinutes} min={0} max={30} onChange={(debateMinutes) => void set({ debateMinutes })} testID="debate-minutes" />
+        <AppText variant="bodyStrong">Style de l’annonce de l’aube</AppText>
+        <Segmented<AnnouncementStyleSetting>
+          value={settings.announcementStyle}
+          onChange={(announcementStyle) => void set({ announcementStyle })}
+          options={[
+            { value: 'sobre', label: 'Sobre' },
+            { value: 'dramatique', label: 'Drame' },
+            { value: 'conte', label: 'Conte' },
+            { value: 'humour', label: 'Humour' },
+          ]}
+          testID="announcement-style"
+        />
+        <ToggleRow label="Annoncer la carte des éliminés" help="Règle de base : la carte d’un joueur éliminé est révélée. Désactivez pour garder le mystère (Enfant sauvage, Chien-loup…)." value={settings.revealRolesAtDawn} onChange={(revealRolesAtDawn) => void set({ revealRolesAtDawn })} />
+      </Panel>
+
+      <SectionTitle>Accessibilité</SectionTitle>
+      <Panel>
+        <ToggleRow label="Contraste élevé" help="Textes plus contrastés, bordures et contours renforcés." value={settings.highContrast} onChange={(highContrast) => void set({ highContrast })} testID="contrast-toggle" />
+        <ToggleRow label="Réduire les animations" help="S’ajoute au réglage « Réduire les animations » de l’appareil." value={settings.reduceMotion} onChange={(reduceMotion) => void set({ reduceMotion })} />
+        <AppText variant="caption" tone="faint">
+          La taille du texte suit le réglage de l’appareil (Taille du texte / Dynamic Type) ; VoiceOver lit chaque bouton et chaque joueur.
+        </AppText>
       </Panel>
 
       <SectionTitle>Règles et données</SectionTitle>

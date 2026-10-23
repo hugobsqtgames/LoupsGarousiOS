@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import {
-  aWolfHasDied,
+  bigBadWolfBlocked,
   attackedThisNight,
   foxFindsWolf,
   foxGroup,
@@ -13,7 +14,8 @@ import {
   type StepPayload,
 } from '@/engine';
 import { Button } from '@/components/button';
-import { ToggleRow } from '@/components/controls';
+import { PrivateReveal } from '@/components/private-reveal';
+import { Segmented, ToggleRow } from '@/components/controls';
 import { RoleMedallion } from '@/components/game-ui';
 import { Icon } from '@/components/icon';
 import { Panel } from '@/components/panel';
@@ -76,6 +78,26 @@ export function StepForm({ state, step, value, onChange }: FormProps) {
           </View>
         </Panel>
       );
+    case 'judge':
+      return (
+        <Panel overline="Signe convenu">
+          <AppText variant="small" tone="muted">
+            Le Juge bègue vous montre le signe qu’il fera pendant un vote pour imposer un second vote (une seule fois dans la partie). Mémorisez-le.
+          </AppText>
+          <AppText variant="bodyStrong">{step.actorIds.map((id) => nameOf(state, id)).join(' · ')}</AppText>
+        </Panel>
+      );
+    case 'bear-tamer':
+      return (
+        <Panel overline="Repérage">
+          <AppText variant="small" tone="muted">
+            Notez qui est le Montreur d’ours : chaque matin, l’application vous dira si son ours grogne.
+          </AppText>
+          <AppText variant="bodyStrong">{step.actorIds.map((id) => nameOf(state, id)).join(' · ')}</AppText>
+        </Panel>
+      );
+    case 'gypsy':
+      return <GypsyForm state={state} step={step} value={value} onChange={onChange} />;
     case 'lovers':
     case 'sisters':
     case 'brothers':
@@ -90,6 +112,7 @@ export function StepForm({ state, step, value, onChange }: FormProps) {
       const mustTake = cards.every((c) => c === 'loup-garou');
       return (
         <View style={styles.gap}>
+          {state.setup.dealMode === 'phone' && actor ? <ThiefPhoneReveal state={state} actorName={actor.name} cards={cards} mustTake={mustTake} onChoose={(cardIndex) => onChange({ cardIndex })} /> : null}
           {cards.map((c, i) => {
             const def = registry.get(c);
             const active = value.cardIndex === i;
@@ -253,7 +276,7 @@ export function StepForm({ state, step, value, onChange }: FormProps) {
       );
     case 'big-bad-wolf': {
       const pack = packVictim(state, state.night?.choices.wolves);
-      return single(playerOptions(state.players, { exclude: (p) => (isWolfSide(p) ? 'Loup' : p.id === pack ? 'Victime de la meute' : null) }), aWolfHasDied(state) ? 'Pouvoir perdu' : 'Pas de seconde victime');
+      return single(playerOptions(state.players, { exclude: (p) => (isWolfSide(p) ? 'Loup' : p.id === pack ? 'Victime de la meute' : null) }), bigBadWolfBlocked(state) ? 'Pouvoir perdu' : 'Pas de seconde victime');
     }
     case 'witch': {
       const attacked = attackedThisNight(state, state.night?.choices ?? {});
@@ -320,6 +343,91 @@ export function StepForm({ state, step, value, onChange }: FormProps) {
   }
 }
 
+/** Gitane : carte Spiritisme (1 à 5), question (1 à 4) et joueur qui la posera au matin. */
+function GypsyForm({ state, step, value, onChange }: FormProps) {
+  const actor = state.players.find((p) => p.id === step.actorIds[0]);
+  const used = actor?.spiritCardsUsed ?? [];
+  const declined = value.target === null;
+  return (
+    <View style={styles.gap}>
+      <AppText variant="small" tone="muted">
+        Si elle accepte, lisez les quatre questions d’une carte Spiritisme ; elle en désigne une, puis le joueur qui la posera au matin. Le premier éliminé répondra par oui ou non.
+      </AppText>
+      <AppText variant="overline" tone="muted">
+        Carte Spiritisme
+      </AppText>
+      <View style={styles.wrap}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <Button
+            key={n}
+            label={`N° ${n}`}
+            size="sm"
+            disabled={used.includes(n) || declined}
+            variant={value.cardIndex === n ? 'primary' : 'secondary'}
+            onPress={() => onChange({ ...value, cardIndex: n })}
+            accessibilityHint={used.includes(n) ? 'Carte déjà utilisée' : undefined}
+            testID={`gypsy-card-${n}`}
+          />
+        ))}
+      </View>
+      <AppText variant="overline" tone="muted">
+        Question choisie
+      </AppText>
+      <Segmented<number>
+        value={value.question ?? 0}
+        onChange={(question) => !declined && onChange({ ...value, question })}
+        options={[1, 2, 3, 4].map((q) => ({ value: q, label: `Q${q}` }))}
+        testID="gypsy-question"
+      />
+      <AppText variant="overline" tone="muted">
+        Joueur qui posera la question (le Spirite)
+      </AppText>
+      <OptionGrid options={playerOptions(state.players)} selected={value.target ? [value.target] : []} onSelect={(id) => onChange({ ...value, target: value.target === id ? undefined : id })} testID="target-grid" />
+      <NoTarget active={declined} onPress={() => onChange({ target: null })} label="Elle n’utilise pas son pouvoir" />
+    </View>
+  );
+}
+
+/** Mode téléphone : le Voleur découvre lui-même les deux cartes du centre et choisit. */
+function ThiefPhoneReveal({ state, actorName, cards, mustTake, onChoose }: { state: GameState; actorName: string; cards: GameState['setup']['extraCards']; mustTake: boolean; onChoose: (i: number | null) => void }) {
+  const { registry } = useRoleRegistry();
+  const [open, setOpen] = useState(false);
+  void state;
+  return (
+    <>
+      <Button label="Montrer les cartes du centre au Voleur" icon="phone" variant="secondary" onPress={() => setOpen(true)} testID="thief-phone" />
+      <PrivateReveal visible={open} playerName={actorName} instruction="Le Voleur découvre les deux cartes du centre et choisit seul." doneLabel="Cacher sans changer" onDone={() => setOpen(false)} testID="thief-reveal">
+        {(hide) => (
+          <View style={styles.gap}>
+            <AppText variant="title" align="center">
+              Les deux cartes du centre
+            </AppText>
+            {cards.map((c, i) => {
+              const def = registry.get(c);
+              return (
+                <Panel key={i} style={styles.cardRow} onPress={() => { onChoose(i); hide(); }} testID={`thief-phone-take-${i}`}>
+                  <RoleMedallion role={def} size={52} />
+                  <View style={styles.flex}>
+                    <AppText variant="overline" tone="muted">{`Prendre la carte ${i + 1}`}</AppText>
+                    <AppText variant="heading">{def.name}</AppText>
+                  </View>
+                </Panel>
+              );
+            })}
+            {mustTake ? (
+              <AppText variant="small" tone="warning" align="center">
+                Deux Loups-Garous : tu dois en prendre un.
+              </AppText>
+            ) : (
+              <Button label="Garder ma carte de Voleur" variant="secondary" onPress={() => { onChoose(null); hide(); }} testID="thief-phone-keep" />
+            )}
+          </View>
+        )}
+      </PrivateReveal>
+    </>
+  );
+}
+
 /** Valeur initiale d'un formulaire d'étape (aucune cible tant que le MJ n'a pas choisi). */
 export function defaultValue(step: NightStep): StepPayload {
   if (step.payload) return step.payload;
@@ -343,6 +451,10 @@ export function isComplete(step: NightStep, v: StepPayload, state: GameState): b
       const avail = state.players.filter((p) => p.alive && !p.charmed && p.id !== step.actorIds[0]).length;
       return (v.targets ?? []).length === Math.min(2, avail);
     }
+    case 'gypsy':
+      return v.target === null || (v.target !== undefined && v.cardIndex !== undefined && v.cardIndex !== null && v.question !== undefined);
+    case 'judge':
+    case 'bear-tamer':
     case 'witch':
     case 'infect':
     case 'bluff':

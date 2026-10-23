@@ -2,7 +2,12 @@ import { router } from 'expo-router';
 import { toHome } from '@/utils/nav';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { activeBallot, canOpenBallot, computeNightSteps, judgeCanCallSecondVote, nameOf, phaseLabel, WINNER_LABELS, type GameState } from '@/engine';
+import { activeBallot, canOpenBallot, computeNightSteps, judgeCanCallSecondVote, nameOf, phaseLabel, reminders, WINNER_LABELS, type GameState } from '@/engine';
+import { DebateTimer } from '@/components/debate-timer';
+import { OptionGrid, playerOptions } from '@/components/player-picker';
+import { RemindersPanel } from '@/components/reminders';
+import { useAppStore } from '@/state/app-store';
+import { EventsPanel, MjToolsSheet, type MjTool } from './events-panel';
 import { Button, IconButton } from '@/components/button';
 import { TextField } from '@/components/controls';
 import { DecisionPanel } from '@/components/decision-panel';
@@ -19,12 +24,13 @@ import { useGameStore } from '@/state/game-store';
 import { useTheme } from '@/theme/theme-context';
 import { spacing } from '@/theme/themes';
 
-function go(state: GameState, path: 'night' | 'dawn' | 'vote' | 'history' | 'summary') {
+function go(state: GameState, path: 'night' | 'dawn' | 'vote' | 'history' | 'summary' | 'timeline' | 'table' | 'deal' | 'replay') {
   router.push({ pathname: `/game/[id]/${path}`, params: { id: state.setup.id } });
 }
 
 function PhaseCard({ state }: { state: GameState }) {
   const act = useGameAction();
+  const debateMinutes = useAppStore((s) => s.settings.debateMinutes);
   const { confirm } = useFeedback();
   const ballot = activeBallot(state);
 
@@ -66,7 +72,10 @@ function PhaseCard({ state }: { state: GameState }) {
         <AppText variant="small" tone="muted">
           {done === steps.length ? 'Toutes les étapes sont renseignées : résolvez la nuit.' : `${done} étape(s) sur ${steps.length} renseignée(s).`}
         </AppText>
-        <Button label={done === 0 ? 'Commencer la nuit' : 'Continuer la nuit'} icon="moon" size="lg" onPress={() => go(state, 'night')} testID="open-night" />
+        {state.setup.dealMode === 'phone' && state.actionCount === 0 ? (
+          <Button label="Distribuer les rôles sur le téléphone" icon="phone" size="lg" onPress={() => go(state, 'deal')} testID="open-deal" />
+        ) : null}
+        <Button label={done === 0 ? 'Commencer la nuit' : 'Continuer la nuit'} icon="moon" size="lg" variant={state.setup.dealMode === 'phone' && state.actionCount === 0 ? 'secondary' : 'primary'} onPress={() => go(state, 'night')} testID="open-night" />
       </Panel>
     );
   }
@@ -89,6 +98,7 @@ function PhaseCard({ state }: { state: GameState }) {
   const ballotOpen = ballot && (ballot.status === 'open' || ballot.status === 'closed');
   return (
     <Panel tone="accent" overline={phaseLabel(state.phase)} title="Le village débat" testID="phase-card">
+      {debateMinutes > 0 && !ballotOpen ? <DebateTimer key={`${state.dayNumber}-${debateMinutes}`} minutes={debateMinutes} testID="debate-timer" /> : null}
       {ballotOpen ? (
         <Button label={ballot.kind === 'mayor' ? 'Reprendre l’élection du maire' : 'Reprendre le vote'} icon="ballot" size="lg" onPress={() => go(state, 'vote')} testID="resume-ballot" />
       ) : (
@@ -127,21 +137,17 @@ function PhaseCard({ state }: { state: GameState }) {
   );
 }
 
-function EffectsPanel({ state, hide }: { state: GameState; hide: boolean }) {
+/** Informations secrètes en cours (masquées avec les rôles). */
+function SecretsPanel({ state, hide }: { state: GameState; hide: boolean }) {
+  if (hide) return null;
   const items: string[] = [];
-  if (state.villagePowersLost) items.push('Les villageois ont perdu leurs pouvoirs (vengeance de l’Ancien).');
-  if (state.restrictedVoters && state.restrictedVoters.day >= state.dayNumber) {
-    items.push(`Jour ${state.restrictedVoters.day} : seuls votent ${state.restrictedVoters.voters.map((v) => nameOf(state, v)).join(', ') || 'personne'}.`);
-  }
-  if (!hide) {
-    if (state.ravenMark && state.ravenMark.day >= state.dayNumber) items.push(`Corbeau : ${nameOf(state, state.ravenMark.targetId)} recevra ${state.setup.variants.ravenBonus} voix supplémentaires au jour ${state.ravenMark.day}.`);
-    if (state.rustyCurse) items.push(`Épée rouillée : ${nameOf(state, state.rustyCurse.wolfId)} mourra la nuit ${state.rustyCurse.night}.`);
-    if (state.lovers) items.push(`Amoureux : ${nameOf(state, state.lovers[0])} et ${nameOf(state, state.lovers[1])}.`);
-    if (state.comedianCards.length) items.push(`Cartes du Comédien restantes : ${state.comedianCards.length}.`);
-  }
+  if (state.lovers) items.push(`Amoureux : ${nameOf(state, state.lovers[0])} et ${nameOf(state, state.lovers[1])}.`);
+  if (state.comedianCards.length) items.push(`Cartes du Comédien restantes : ${state.comedianCards.length}.`);
+  const charmed = state.players.filter((p) => p.alive && p.charmed);
+  if (charmed.length) items.push(`Charmés : ${charmed.map((p) => p.name).join(', ')}.`);
   if (items.length === 0) return null;
   return (
-    <Panel overline="Effets en cours" testID="effects-panel">
+    <Panel overline="Secrets en cours" testID="effects-panel">
       {items.map((t) => (
         <AppText key={t} variant="small" tone="muted">
           • {t}
@@ -150,6 +156,9 @@ function EffectsPanel({ state, hide }: { state: GameState; hide: boolean }) {
     </Panel>
   );
 }
+
+/** Rappels qui nomment un joueur lié à un secret : masqués avec les rôles. */
+const SECRET_REMINDERS = new Set(['rusty', 'white-next', 'angel']);
 
 export function GameDashboard() {
   const state = useGameState();
@@ -164,6 +173,10 @@ export function GameDashboard() {
   const act = useGameAction();
   const { colors } = useTheme();
   const [noteOpen, setNoteOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [tool, setTool] = useState<MjTool | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const generalReminders = reminders(state).filter((r) => !hide || !SECRET_REMINDERS.has(r.id));
   const [note, setNote] = useState('');
   const alive = state.players.filter((p) => p.alive);
   const dead = state.players.filter((p) => !p.alive);
@@ -178,6 +191,8 @@ export function GameDashboard() {
       right={
         <>
           <IconButton icon={hide ? 'eye-off' : 'eye'} label={hide ? 'Afficher les rôles' : 'Masquer les rôles'} onPress={() => setHide(!hide)} active={!hide} testID="toggle-secrets" />
+          <IconButton icon="timeline" label="Chronologie" onPress={() => go(state, 'timeline')} testID="open-timeline" />
+          <IconButton icon="table" label="Plan de table" onPress={() => go(state, 'table')} testID="open-table" />
           <IconButton icon="history" label="Historique" onPress={() => go(state, 'history')} testID="open-history" />
         </>
       }
@@ -205,7 +220,34 @@ export function GameDashboard() {
       ) : null}
       <PhaseCard state={state} />
       {showDecision ? <DecisionPanel state={state} /> : null}
-      <EffectsPanel state={state} hide={hide} />
+      <EventsPanel
+        state={state}
+        onTool={(t) => {
+          setTool(t);
+          setToolsOpen(true);
+        }}
+      />
+      <RemindersPanel items={generalReminders} testID="reminders-panel" />
+      <SecretsPanel state={state} hide={hide} />
+      {state.phase.kind === 'day' || state.phase.kind === 'dawn' || state.setup.dealMode === 'phone' ? (
+        <View style={styles.footerRow}>
+          {state.phase.kind === 'day' || state.phase.kind === 'dawn' ? (
+            <Button
+              label="Outils du MJ"
+              icon="sparkles"
+              variant="secondary"
+              size="sm"
+              onPress={() => {
+                setTool(null);
+                setToolsOpen(true);
+              }}
+              style={styles.flex}
+              testID="open-mj-tools"
+            />
+          ) : null}
+          {state.setup.dealMode === 'phone' && state.phase.kind !== 'ended' ? <Button label="Revoir un rôle" icon="phone" variant="secondary" size="sm" onPress={() => setReviewOpen(true)} style={styles.flex} testID="review-role" /> : null}
+        </View>
+      ) : null}
       <SectionTitle right={hide ? <Icon name="lock" color={colors.textFaint} size={16} /> : undefined}>{`Joueurs en vie (${alive.length})`}</SectionTitle>
       <Panel padded={false}>
         {alive.map((p) => (
@@ -222,6 +264,26 @@ export function GameDashboard() {
           </Panel>
         </>
       ) : null}
+      <MjToolsSheet
+        state={state}
+        visible={toolsOpen}
+        tool={tool}
+        onClose={() => {
+          setToolsOpen(false);
+          setTool(null);
+        }}
+      />
+      <Sheet visible={reviewOpen} title="Revoir un rôle" subtitle="Le joueur verra son rôle actuel sur un écran privé." onClose={() => setReviewOpen(false)}>
+        <OptionGrid
+          options={playerOptions(state.players)}
+          selected={[]}
+          onSelect={(pid) => {
+            setReviewOpen(false);
+            router.push({ pathname: '/game/[id]/deal', params: { id: state.setup.id, pid } });
+          }}
+          testID="review-grid"
+        />
+      </Sheet>
       <Sheet
         visible={noteOpen}
         title="Note du MJ"

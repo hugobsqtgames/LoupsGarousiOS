@@ -1,7 +1,10 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { describeEntry, DEATH_CAUSE_LABELS, nameOf, phaseLabel, roleName, WINNER_LABELS } from '@/engine';
+import { ANNOUNCEMENT_STYLES, dawnAnnouncement, describeEntry, DEATH_CAUSE_LABELS, nameOf, phaseLabel, roleName, WINNER_LABELS, type AnnouncementStyle } from '@/engine';
+import { useAudio } from '@/audio/audio-context';
+import { Segmented } from '@/components/controls';
+import { useAppStore } from '@/state/app-store';
 import { Button } from '@/components/button';
 import { DecisionPanel } from '@/components/decision-panel';
 import { useFeedback } from '@/components/feedback';
@@ -28,6 +31,11 @@ export function DawnScreen() {
   const deaths = state.dawnReport.filter((e) => e.event.type === 'death');
   const bear = state.dawnReport.find((e) => e.event.type === 'bear');
   const idParams = { id: state.setup.id };
+  const settings = useAppStore((s) => s.settings);
+  const audio = useAudio();
+  const [style, setStyle] = useState<AnnouncementStyle>(settings.announcementStyle);
+  const announcement = dawnAnnouncement(state, style, { revealRoles: settings.revealRolesAtDawn });
+  const spirit = state.dawnReport.find((e) => e.event.type === 'spiritualism');
 
   if (state.phase.kind !== 'dawn') {
     return (
@@ -98,6 +106,30 @@ export function DawnScreen() {
         ) : null}
       </Panel>
 
+      <Panel overline="Annonce prête à lire" testID="dawn-story">
+        <Segmented<AnnouncementStyle> value={style} onChange={setStyle} options={ANNOUNCEMENT_STYLES.map((o) => ({ value: o.value, label: o.label }))} testID="story-style" />
+        {announcement.paragraphs.map((p, i) => (
+          <AppText key={i} variant="body" style={styles.story}>
+            {p}
+          </AppText>
+        ))}
+        <Button
+          label={settings.narrationEnabled ? 'Lire à voix haute' : 'Narration désactivée (Paramètres)'}
+          icon="megaphone"
+          variant="secondary"
+          size="sm"
+          disabled={!settings.narrationEnabled}
+          onPress={() => audio.narrate(announcement.paragraphs.join(' '))}
+          testID="story-read"
+        />
+      </Panel>
+
+      {spirit && spirit.event.type === 'spiritualism' ? (
+        <Panel overline="Spiritisme (Gitane)" testID="dawn-spirit">
+          <AppText variant="small">{describeEntry(state, spirit)}</AppText>
+        </Panel>
+      ) : null}
+
       {state.pending.length > 0 ? <DecisionPanel state={state} /> : null}
 
       {state.victory ? (
@@ -143,4 +175,5 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   death: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xs },
   inline: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
+  story: { fontStyle: 'italic' },
 });

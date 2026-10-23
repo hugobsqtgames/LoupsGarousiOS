@@ -245,3 +245,20 @@ describe('volume', () => {
     expect(await repo.listGames()).toEqual([]);
   });
 });
+
+describe('résumés par joueur', () => {
+  it('les résumés anciens (sans détail par joueur) sont recalculés à l’ouverture', async () => {
+    const { repo, db } = await openRepo();
+    const g = sampleGame('old');
+    await repo.saveGame(g.record, g.state);
+    const row = await db.first<{ summary_json: string }>('SELECT summary_json FROM games WHERE id = ?', ['old']);
+    const legacy = JSON.parse(row!.summary_json);
+    delete legacy.players;
+    delete legacy.summaryVersion;
+    await db.run('UPDATE games SET summary_json = ? WHERE id = ?', [JSON.stringify(legacy), 'old']);
+    const reopened = await Repository.open(db);
+    const [summary] = await reopened.listGames();
+    expect(summary.players).toHaveLength(8);
+    expect(summary.players!.find((p) => p.name === 'Joueur 5')).toMatchObject({ alive: false, firstNightDeath: true });
+  });
+});

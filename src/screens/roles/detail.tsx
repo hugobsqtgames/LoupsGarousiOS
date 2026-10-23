@@ -4,6 +4,7 @@ import { CERTAINTY_LABELS, EXPANSION_LABELS, isCustomRoleId, TEAM_LABELS, type R
 import { Button } from '@/components/button';
 import { useFeedback } from '@/components/feedback';
 import { RoleMedallion } from '@/components/game-ui';
+import { RoleArt } from '@/components/role-art';
 import { Chip, Panel, SectionTitle } from '@/components/panel';
 import { Screen } from '@/components/screen';
 import { AppText } from '@/components/text';
@@ -46,6 +47,9 @@ export function RoleDetailScreen() {
 
   return (
     <Screen overline={`${TEAM_LABELS[r.team]} · ${EXPANSION_LABELS[r.expansion]}`} title={r.name} back>
+      <View style={styles.art} testID="role-art">
+        <RoleArt roleId={r.id} team={r.team} width={220} />
+      </View>
       <Panel tone="raised">
         <View style={styles.head}>
           <RoleMedallion role={r} size={64} />
@@ -148,6 +152,7 @@ export function RoleDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  art: { alignItems: 'center' },
   flex: { flex: 1 },
   head: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },

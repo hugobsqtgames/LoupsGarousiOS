@@ -1,13 +1,15 @@
-import { useEffect, useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { WINNER_LABELS } from '@/engine';
-import { EmptyState } from '@/components/game-ui';
+import { EmptyState, PlayerAvatar } from '@/components/game-ui';
 import { Panel, SectionTitle } from '@/components/panel';
 import { Screen } from '@/components/screen';
 import { AppText } from '@/components/text';
 import { useRoleRegistry } from '@/hooks/use-roles';
 import { useAppStore } from '@/state/app-store';
-import { computeStats } from '@/state/stats';
+import { computePlayerStats, computeStats, type PlayerStats } from '@/state/stats';
+import { Sheet } from '@/components/sheet';
+import { Icon } from '@/components/icon';
 import { useTheme } from '@/theme/theme-context';
 import { radius, spacing } from '@/theme/themes';
 
@@ -47,6 +49,10 @@ export function StatsScreen() {
   const refresh = useAppStore((s) => s.refreshGames);
   const { registry } = useRoleRegistry();
   const stats = useMemo(() => computeStats(games), [games]);
+  const players = useMemo(() => computePlayerStats(games), [games]);
+  const [detail, setDetail] = useState<PlayerStats | null>(null);
+  const { colors } = useTheme();
+  const pct = (r: number | null) => (r === null ? '—' : `${Math.round(r * 100)} %`);
   useEffect(() => {
     refresh().catch(() => undefined);
   }, [refresh]);
@@ -64,6 +70,39 @@ export function StatsScreen() {
             <Tile value={stats.avgNights ?? '—'} label="nuits en moyenne" />
             <Tile value={stats.avgPlayers ?? '—'} label="joueurs en moyenne" />
           </View>
+          <SectionTitle>Par joueur</SectionTitle>
+          <Panel padded={false} testID="stats-players">
+            {players.length === 0 ? (
+              <View style={styles.pad}>
+                <AppText variant="small" tone="muted">
+                  Les statistiques par joueur apparaissent pour les parties enregistrées avec cette version. Un joueur est reconnu par son nom.
+                </AppText>
+              </View>
+            ) : (
+              players.slice(0, 40).map((p) => (
+                <Pressable
+                  key={p.key}
+                  onPress={() => setDetail(p)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${p.name} : ${p.games} partie(s), ${p.wins} victoire(s), taux ${pct(p.winRate)}`}
+                  style={({ pressed }) => [styles.playerRow, { borderBottomColor: colors.border, backgroundColor: pressed ? colors.surfacePressed : 'transparent' }]}
+                  testID={`player-stat-${p.key}`}
+                >
+                  <PlayerAvatar name={p.name} size={36} />
+                  <View style={styles.flexCol}>
+                    <AppText variant="bodyStrong">{p.name}</AppText>
+                    <AppText variant="caption" tone="muted">
+                      {p.games} partie(s) · {p.wins} victoire(s) · maire {p.mayorTimes} fois
+                    </AppText>
+                  </View>
+                  <AppText variant="bodyStrong" tone="accent">
+                    {pct(p.winRate)}
+                  </AppText>
+                  <Icon name="chevron-right" color={colors.textFaint} size={18} />
+                </Pressable>
+              ))
+            )}
+          </Panel>
           <SectionTitle>Victoires par camp</SectionTitle>
           <Panel testID="stats-wins">
             {stats.winsByCamp.length === 0 ? (
@@ -101,11 +140,35 @@ export function StatsScreen() {
           ) : null}
         </>
       )}
+      <Sheet visible={detail !== null} title={detail?.name ?? ''} subtitle={detail ? `${detail.games} partie(s) jouée(s)` : undefined} onClose={() => setDetail(null)} testID="player-stat-sheet">
+        {detail ? (
+          <>
+            <View style={styles.tiles}>
+              <Tile value={pct(detail.winRate)} label="de victoires" />
+              <Tile value={detail.firstNightDeaths} label="morts la 1ʳᵉ nuit" />
+              <Tile value={detail.mayorTimes} label="fois maire" />
+              <Tile value={detail.survived} label="fois survivant" />
+            </View>
+            <AppText variant="overline" tone="muted">
+              Rôles joués
+            </AppText>
+            {detail.roles.map((r) => (
+              <BarRow key={r.roleId} label={name(r.roleId)} value={r.count} max={detail.roles[0].count} />
+            ))}
+            <AppText variant="caption" tone="faint">
+              Taux calculé sur {detail.decided} partie(s) terminée(s) avec un vainqueur.
+            </AppText>
+          </>
+        ) : null}
+      </Sheet>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  pad: { padding: spacing.md },
+  flexCol: { flex: 1, gap: 1 },
+  playerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, minHeight: 56 },
   tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   tile: { flexBasis: '47%', flexGrow: 1 },
   barRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 30 },

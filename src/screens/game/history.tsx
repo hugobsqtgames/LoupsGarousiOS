@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { describeAction, describeEntry, nameOf, type GameAction } from '@/engine';
@@ -79,7 +80,12 @@ export function HistoryScreen() {
   const editingAction = editing !== null ? actions[editing]?.action : null;
 
   return (
-    <Screen title="Historique" overline={`${actions.length} action(s) enregistrée(s)`} back right={<IconButton icon="undo" label="Annuler la dernière action" onPress={() => void undo()} disabled={actions.length === 0} testID="history-undo" />}>
+    <Screen title="Historique" overline={`${actions.length} action(s) enregistrée(s)`} back right={
+        <>
+          <IconButton icon="replay" label="Rejeu pas à pas" onPress={() => router.push({ pathname: '/game/[id]/replay', params: { id: state.setup.id } })} disabled={actions.length === 0} testID="history-replay" />
+          <IconButton icon="undo" label="Annuler la dernière action" onPress={() => void undo()} disabled={actions.length === 0} testID="history-undo" />
+        </>
+      }>
       <Segmented
         value={view}
         onChange={setView}

@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { createRng, MAX_NAME_LENGTH, MAX_PLAYERS, nameKey, normalizeName, shuffle } from '@/engine';
 import { Button, IconButton } from '@/components/button';
-import { TextField } from '@/components/controls';
+import { Segmented, TextField } from '@/components/controls';
+import { moveItem, SeatingCircle } from '@/components/seating-circle';
+import { useAppStore } from '@/state/app-store';
+import { computePlayerStats } from '@/state/stats';
 import { useFeedback } from '@/components/feedback';
 import { EmptyState } from '@/components/game-ui';
 import { Panel } from '@/components/panel';
@@ -23,9 +26,16 @@ export function StepPlayers() {
   const [editing, setEditing] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const duplicates = new Set(nameIssues(draft.players).map(nameKey));
+  const [view, setView] = useState<'list' | 'table'>('list');
+  const [seatSel, setSeatSel] = useState<string | null>(null);
+  const games = useAppStore((s) => s.games);
+  const present = new Set(draft.players.map((p) => nameKey(p.name)));
+  const regulars = computePlayerStats(games)
+    .filter((s) => !present.has(s.key))
+    .slice(0, 16);
 
-  const add = () => {
-    const n = normalizeName(name);
+  const add = (raw = name) => {
+    const n = normalizeName(raw);
     if (!n) return setError('Saisissez un nom.');
     if (n.length > MAX_NAME_LENGTH) return setError(`${MAX_NAME_LENGTH} caractères maximum.`);
     if (draft.players.some((p) => nameKey(p.name) === nameKey(n))) return setError(`« ${n} » est déjà dans la liste.`);
@@ -74,7 +84,7 @@ export function StepPlayers() {
                 setName(t);
                 setError(null);
               }}
-              onSubmitEditing={add}
+              onSubmitEditing={() => add()}
               returnKeyType="done"
               blurOnSubmit={false}
               autoCapitalize="words"
@@ -84,14 +94,51 @@ export function StepPlayers() {
               testID="player-name-input"
             />
           </View>
-          <IconButton icon="plus" label="Ajouter le joueur" onPress={add} tone="accent" size={52} testID="add-player" />
+          <IconButton icon="plus" label="Ajouter le joueur" onPress={() => add()} tone="accent" size={52} testID="add-player" />
         </View>
         <AppText variant="caption" tone="muted">
           L’ordre de la liste suit les places autour de la table, dans le sens des aiguilles d’une montre (utile pour le Renard, l’ours et le Chevalier).
         </AppText>
       </Panel>
 
-      {draft.players.length === 0 ? (
+      {regulars.length > 0 ? (
+        <Panel overline="Joueurs habituels" testID="regulars">
+          <AppText variant="caption" tone="muted">
+            Reprendre le même nom d’une partie à l’autre permet de suivre les statistiques de chacun.
+          </AppText>
+          <View style={styles.wrap}>
+            {regulars.map((r) => (
+              <Button key={r.key} label={r.name} icon="user-plus" size="sm" variant="secondary" onPress={() => add(r.name)} testID={`regular-${r.key}`} />
+            ))}
+          </View>
+        </Panel>
+      ) : null}
+
+      {draft.players.length > 2 ? (
+        <Segmented<'list' | 'table'>
+          value={view}
+          onChange={setView}
+          options={[
+            { value: 'list', label: 'Liste' },
+            { value: 'table', label: 'Plan de table' },
+          ]}
+          testID="players-view"
+        />
+      ) : null}
+
+      {view === 'table' && draft.players.length > 2 ? (
+        <Panel overline="Plan de table" testID="draft-table">
+          <AppText variant="caption" tone="muted">
+            Faites glisser un joueur vers sa place, ou touchez-le puis utilisez les boutons. Place 1 en haut, sens horaire.
+          </AppText>
+          <SeatingCircle
+            seats={draft.players.map((p) => ({ id: p.id, name: p.name }))}
+            selectedId={seatSel}
+            onSelect={(id) => setSeatSel(seatSel === id ? null : id)}
+            onReorder={(from, to) => update((d) => ({ ...d, players: moveItem(d.players, from, to) }))}
+          />
+        </Panel>
+      ) : draft.players.length === 0 ? (
         <EmptyState icon="users" title="Aucun joueur" message="Ajoutez au moins 5 joueurs pour composer le village." />
       ) : (
         <Panel padded={false} overline={undefined}>
@@ -151,4 +198,5 @@ const styles = StyleSheet.create({
   addRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
   playerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth },
   seat: { width: 22, textAlign: 'center' },
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
 });

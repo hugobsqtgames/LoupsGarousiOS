@@ -6,6 +6,9 @@ import {
   CUSTOM_ACTION_LABELS,
   CUSTOM_ACTIONS,
   CUSTOM_ON_DEATH,
+  CUSTOM_WIN_CONDITIONS,
+  CUSTOM_WIN_LABELS,
+  effectiveWinCondition,
   CUSTOM_ON_DEATH_LABELS,
   CUSTOM_SCHEDULE_LABELS,
   CUSTOM_SCHEDULES,
@@ -80,7 +83,7 @@ export function CustomRoleEditor() {
       <Panel overline="Camp">
         <Segmented<Team>
           value={role.team}
-          onChange={(team) => set({ team })}
+          onChange={(team) => set({ team, winCondition: team === 'solo' ? (role.winCondition && role.winCondition !== 'camp' ? role.winCondition : 'last-survivor') : 'camp' })}
           options={[
             { value: 'village', label: 'Village' },
             { value: 'wolves', label: 'Loups' },
@@ -88,14 +91,37 @@ export function CustomRoleEditor() {
           ]}
           testID="role-team"
         />
+        <AppText variant="overline" tone="muted">
+          Condition de victoire
+        </AppText>
         {role.team === 'solo' ? (
-          <AppText variant="caption" tone="warning">
-            Un solitaire personnalisé n’a pas de condition de victoire propre : il empêche la victoire des camps tant qu’il est vivant.
+          <>
+            <OptionGrid
+              options={CUSTOM_WIN_CONDITIONS.filter((w) => w !== 'camp').map((w) => ({
+                id: w,
+                label: CUSTOM_WIN_LABELS[w],
+                disabled: w === 'all-marked' && role.nightAction !== 'mark',
+                disabledReason: 'Nécessite l’action « Marquer »',
+              }))}
+              selected={[effectiveWinCondition(role)]}
+              onSelect={(w) => set({ winCondition: w as CustomRoleDef['winCondition'] })}
+              columns={2}
+              testID="role-win"
+            />
+            {effectiveWinCondition(role) === 'opposite-group' ? (
+              <AppText variant="caption" tone="muted">
+                Les deux groupes se définissent à la création de la partie, comme pour l’Abominable sectaire.
+              </AppText>
+            ) : null}
+          </>
+        ) : (
+          <AppText variant="small" tone="muted">
+            {CUSTOM_WIN_LABELS.camp} : {role.team === 'wolves' ? 'élimination de tous les villageois.' : 'élimination de tous les loups.'}
           </AppText>
-        ) : null}
+        )}
       </Panel>
       <Panel overline="Action nocturne">
-        <OptionGrid options={CUSTOM_ACTIONS.map((a) => ({ id: a, label: CUSTOM_ACTION_LABELS[a] }))} selected={[role.nightAction]} onSelect={(a) => set({ nightAction: a as CustomRoleDef['nightAction'] })} columns={2} testID="role-action" />
+        <OptionGrid options={CUSTOM_ACTIONS.map((a) => ({ id: a, label: CUSTOM_ACTION_LABELS[a] }))} selected={[role.nightAction]} onSelect={(a) => set({ nightAction: a as CustomRoleDef['nightAction'], ...(a !== 'mark' && role.winCondition === 'all-marked' ? { winCondition: 'last-survivor' as const } : {}) })} columns={2} testID="role-action" />
         {role.nightAction !== 'none' ? (
           <>
             <AppText variant="overline" tone="muted">

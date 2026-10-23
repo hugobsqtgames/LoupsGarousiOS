@@ -4,6 +4,21 @@ export type ThemeId = 'clair-de-lune' | 'foret' | 'lune-de-sang' | 'parchemin';
 
 export const THEME_IDS: readonly ThemeId[] = ['clair-de-lune', 'foret', 'lune-de-sang', 'parchemin'];
 
+export type NightAmbience = 'auto' | 'night' | 'rain' | 'storm';
+export type AnnouncementStyleSetting = 'sobre' | 'dramatique' | 'conte' | 'humour';
+
+/** Ambiance de nuit associée à chaque thème (réglage « Selon le thème »). */
+export const THEME_NIGHT_AMBIENCE: Record<ThemeId, Exclude<NightAmbience, 'auto'>> = {
+  'clair-de-lune': 'night',
+  foret: 'rain',
+  'lune-de-sang': 'storm',
+  parchemin: 'night',
+};
+
+export function resolveNightAmbience(s: Pick<AppSettings, 'nightAmbience' | 'themeId'>): Exclude<NightAmbience, 'auto'> {
+  return s.nightAmbience === 'auto' ? THEME_NIGHT_AMBIENCE[s.themeId] : s.nightAmbience;
+}
+
 export interface AppSettings {
   themeId: ThemeId;
   /** Coupe tous les sons. */
@@ -25,6 +40,24 @@ export interface AppSettings {
   favoriteRoles: RoleId[];
   /** Aide de démarrage déjà vue. */
   onboardingSeen: boolean;
+  /** Ambiance sonore de la nuit. */
+  nightAmbience: NightAmbience;
+  /** Ambiance du jour (oiseaux) ou silence. */
+  dayAmbience: boolean;
+  /** Hurlement au réveil des loups. */
+  wolfHowl: boolean;
+  /** Cloche du village à l'aube (à la place du carillon). */
+  dawnBell: boolean;
+  /** Durée du débat en minutes (0 = pas de minuteur). */
+  debateMinutes: number;
+  /** Style de l'annonce de l'aube prête à lire. */
+  announcementStyle: AnnouncementStyleSetting;
+  /** Révéler la carte des joueurs éliminés dans l'annonce (règle de base). */
+  revealRolesAtDawn: boolean;
+  /** Contraste élevé (texte et bordures renforcés). */
+  highContrast: boolean;
+  /** Animations réduites (en plus du réglage du système). */
+  reduceMotion: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -42,6 +75,15 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultVariants: DEFAULT_VARIANTS,
   favoriteRoles: [],
   onboardingSeen: false,
+  nightAmbience: 'auto',
+  dayAmbience: true,
+  wolfHowl: true,
+  dawnBell: false,
+  debateMinutes: 3,
+  announcementStyle: 'dramatique',
+  revealRolesAtDawn: true,
+  highContrast: false,
+  reduceMotion: false,
 };
 
 function volume(v: unknown, fallback: number): number {
@@ -73,5 +115,14 @@ export function normalizeSettings(input: unknown): AppSettings {
     defaultVariants: normalizeVariants(s.defaultVariants),
     favoriteRoles: Array.isArray(s.favoriteRoles) ? s.favoriteRoles.filter((r): r is RoleId => typeof r === 'string').slice(0, 100) : [],
     onboardingSeen: bool(s.onboardingSeen, d.onboardingSeen),
+    nightAmbience: (['auto', 'night', 'rain', 'storm'] as const).includes(s.nightAmbience as NightAmbience) ? (s.nightAmbience as NightAmbience) : d.nightAmbience,
+    dayAmbience: bool(s.dayAmbience, d.dayAmbience),
+    wolfHowl: bool(s.wolfHowl, d.wolfHowl),
+    dawnBell: bool(s.dawnBell, d.dawnBell),
+    debateMinutes: typeof s.debateMinutes === 'number' && Number.isInteger(s.debateMinutes) && s.debateMinutes >= 0 && s.debateMinutes <= 30 ? s.debateMinutes : d.debateMinutes,
+    announcementStyle: (['sobre', 'dramatique', 'conte', 'humour'] as const).includes(s.announcementStyle as AnnouncementStyleSetting) ? (s.announcementStyle as AnnouncementStyleSetting) : d.announcementStyle,
+    revealRolesAtDawn: bool(s.revealRolesAtDawn, d.revealRolesAtDawn),
+    highContrast: bool(s.highContrast, d.highContrast),
+    reduceMotion: bool(s.reduceMotion, d.reduceMotion),
   };
 }

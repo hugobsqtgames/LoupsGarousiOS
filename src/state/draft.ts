@@ -8,6 +8,7 @@ import {
   normalizeName,
   shuffle,
   validateSetup,
+  type BalanceAdjustments,
   type Complexity,
   type CustomRoleDef,
   type Expansion,
@@ -43,6 +44,8 @@ export interface Draft {
   expansions: Expansion[];
   allowSolo: boolean;
   explanations: string[];
+  /** Ajuster les poids d'équilibrage d'après les parties terminées (absent = oui). */
+  learnFromHistory?: boolean;
 }
 
 export function emptyDraft(variants: Variants = DEFAULT_VARIANTS, seed = Date.now() % 1_000_000): Draft {
@@ -206,11 +209,11 @@ export function draftIssues(d: Draft, customRoles: CustomRoleDef[]): SetupIssue[
   return issues;
 }
 
-export function applyAutoComposition(d: Draft): Draft {
+export function applyAutoComposition(d: Draft, adjustments?: BalanceAdjustments): Draft {
   const include: RoleId[] = [];
   if ((d.roleCounts.voleur ?? 0) > 0) include.push('voleur');
   if ((d.roleCounts.comedien ?? 0) > 0) include.push('comedien');
-  const comp = generateComposition({ playerCount: d.players.length, expansions: d.expansions, complexity: d.complexity, seed: d.seed, allowSolo: d.allowSolo, include });
+  const comp = generateComposition({ playerCount: d.players.length, expansions: d.expansions, complexity: d.complexity, seed: d.seed, allowSolo: d.allowSolo, include, adjustments: d.learnFromHistory === false ? undefined : adjustments });
   const hasThief = comp.roles.includes('voleur');
   const thiefCards: [RoleId, RoleId] = hasThief ? [comp.extraCards[0], comp.extraCards[1]] : d.thiefCards;
   const comedianCards = comp.roles.includes('comedien') ? comp.extraCards.slice(hasThief ? 2 : 0) : d.comedianCards;

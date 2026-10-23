@@ -2,6 +2,8 @@
 export const AMBIENTS = {
   night: require('../../assets/audio/ambient-night.wav'),
   day: require('../../assets/audio/ambient-day.wav'),
+  rain: require('../../assets/audio/ambient-rain.wav'),
+  storm: require('../../assets/audio/ambient-storm.wav'),
 } as const;
 
 export const EFFECTS = {
@@ -13,6 +15,9 @@ export const EFFECTS = {
   alert: require('../../assets/audio/sfx-alert.wav'),
   step: require('../../assets/audio/sfx-step.wav'),
   victory: require('../../assets/audio/sfx-victory.wav'),
+  howl: require('../../assets/audio/sfx-howl.wav'),
+  bell: require('../../assets/audio/sfx-bell.wav'),
+  timer: require('../../assets/audio/sfx-timer.wav'),
 } as const;
 
 export type AmbientName = keyof typeof AMBIENTS;

@@ -22,7 +22,29 @@ export interface GameSummary {
   nights: number;
   days: number;
   actionCount: number;
+  /** Détail par joueur (statistiques par joueur). Absent des résumés anciens, recalculé à l'ouverture. */
+  players?: PlayerSummary[];
+  /** Version du calcul du résumé. */
+  summaryVersion?: number;
 }
+
+export interface PlayerSummary {
+  name: string;
+  /** Carte reçue au départ. */
+  roleId: RoleId;
+  /** Rôle en fin de partie (Voleur, Servante…). */
+  finalRoleId: RoleId;
+  team: string;
+  won: boolean;
+  alive: boolean;
+  deathPhase: string | null;
+  /** Éliminé(e) pendant la première nuit. */
+  firstNightDeath: boolean;
+  /** Nombre de fois devenu(e) maire (élection ou désignation). */
+  mayorTimes: number;
+}
+
+export const SUMMARY_VERSION = 2;
 
 export interface SavedComposition {
   id: string;
@@ -96,6 +118,18 @@ export function summarize(record: GameRecord, state: GameState, updatedAt: strin
     nights: state.nightNumber,
     days: state.dayNumber,
     actionCount: record.actions.length,
+    players: state.players.map((p) => ({
+      name: p.name,
+      roleId: p.originalRoleId,
+      finalRoleId: p.roleId,
+      team: p.team,
+      won: state.phase.kind === 'ended' && winners.includes(p.id),
+      alive: p.alive,
+      deathPhase: p.death?.phaseLabel ?? null,
+      firstNightDeath: p.death?.phaseLabel === 'Aube 1' || p.death?.phaseLabel === 'Nuit 1',
+      mayorTimes: state.log.filter((e) => e.event.type === 'mayor' && e.event.playerId === p.id && e.event.how !== 'removed').length,
+    })),
+    summaryVersion: SUMMARY_VERSION,
   };
 }
 
@@ -111,7 +145,39 @@ export class Repository {
 
   static async open(db: SqlDriver): Promise<Repository> {
     await migrate(db);
-    return new Repository(db);
+    const repo = new Repository(db);
+    await repo.upgradeSummaries();
+    return repo;
+  }
+
+  /**
+   * Recalcule les résumés produits par une version antérieure (détail par
+   * joueur). Une partie illisible est laissée telle quelle.
+   */
+  async upgradeSummaries(): Promise<number> {
+    return this.queue.run(async () => {
+      const rows = await this.db.all<GameRow>('SELECT * FROM games');
+      let upgraded = 0;
+      for (const row of rows) {
+        let version = 0;
+        try {
+          version = (JSON.parse(row.summary_json) as GameSummary).summaryVersion ?? 0;
+        } catch {
+          continue;
+        }
+        if (version >= SUMMARY_VERSION) continue;
+        try {
+          const record = this.decodeRow(row);
+          const res = replay(record);
+          const summary = summarize(record, res.state, row.updated_at);
+          await this.db.run('UPDATE games SET summary_json = ? WHERE id = ?', [JSON.stringify(summary), row.id]);
+          upgraded += 1;
+        } catch {
+          // Données altérées : le chargement de la partie signalera le problème.
+        }
+      }
+      return upgraded;
+    });
   }
 
   get driver(): SqlDriver {

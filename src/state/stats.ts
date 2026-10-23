@@ -1,4 +1,4 @@
-import type { RoleId, Winner } from '@/engine';
+import { nameKey, type GameOutcomeSample, type RoleId, type Winner } from '@/engine';
 import type { GameSummary } from '@/storage/repository';
 
 export interface Stats {
@@ -43,4 +43,67 @@ export function computeStats(games: GameSummary[]): Stats {
     avgPlayers: avg(games.map((g) => g.playerCount)),
     avgNights: avg(decided.map((g) => g.nights)),
   };
+}
+
+export interface PlayerStats {
+  /** Clé d'identité : nom normalisé (insensible à la casse et aux accents). */
+  key: string;
+  name: string;
+  games: number;
+  /** Parties terminées avec un vainqueur. */
+  decided: number;
+  wins: number;
+  winRate: number | null;
+  survived: number;
+  firstNightDeaths: number;
+  mayorTimes: number;
+  roles: { roleId: RoleId; count: number }[];
+  lastPlayed: string;
+}
+
+/**
+ * Statistiques par joueur. Sans compte ni identifiant, un joueur est reconnu
+ * par son nom (même nom = même personne, à la casse et aux accents près).
+ */
+export function computePlayerStats(games: GameSummary[]): PlayerStats[] {
+  const map = new Map<string, PlayerStats & { roleMap: Map<RoleId, number> }>();
+  for (const g of games) {
+    for (const p of g.players ?? []) {
+      const key = nameKey(p.name);
+      if (!key) continue;
+      let s = map.get(key);
+      if (!s) {
+        s = { key, name: p.name, games: 0, decided: 0, wins: 0, winRate: null, survived: 0, firstNightDeaths: 0, mayorTimes: 0, roles: [], lastPlayed: '', roleMap: new Map() };
+        map.set(key, s);
+      }
+      s.games += 1;
+      const decided = g.status === 'ended' && g.winner !== null && g.winner !== 'abandoned';
+      if (decided) {
+        s.decided += 1;
+        if (p.won) s.wins += 1;
+        if (p.alive) s.survived += 1;
+      }
+      if (p.firstNightDeath) s.firstNightDeaths += 1;
+      s.mayorTimes += p.mayorTimes;
+      s.roleMap.set(p.roleId, (s.roleMap.get(p.roleId) ?? 0) + 1);
+      if (g.updatedAt > s.lastPlayed) {
+        s.lastPlayed = g.updatedAt;
+        s.name = p.name;
+      }
+    }
+  }
+  return [...map.values()]
+    .map(({ roleMap, ...s }) => ({
+      ...s,
+      winRate: s.decided > 0 ? s.wins / s.decided : null,
+      roles: [...roleMap].map(([roleId, count]) => ({ roleId, count })).sort((a, b) => b.count - a.count),
+    }))
+    .sort((a, b) => b.games - a.games || a.name.localeCompare(b.name));
+}
+
+/** Échantillons pour l'équilibrage appris (parties terminées avec un vainqueur). */
+export function balanceSamples(games: GameSummary[]): GameOutcomeSample[] {
+  return games
+    .filter((g) => g.status === 'ended' && g.winner && g.winner !== 'abandoned' && g.winner !== 'none')
+    .map((g) => ({ roles: g.roles, villageWon: g.winner === 'village' }));
 }

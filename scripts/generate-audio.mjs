@@ -105,6 +105,57 @@ function bell(out, start, freq, gain, dur = 2.4) {
   });
 }
 
+/** Pluie : bruit blanc filtré en bande haute + gouttes isolées. */
+function rain(out, gain, seed) {
+  const r = rng(seed);
+  let hp = 0;
+  let prev = 0;
+  for (let i = 0; i < out.length; i++) {
+    const w = r() * 2 - 1;
+    hp = 0.92 * (hp + w - prev);
+    prev = w;
+    const t = i / RATE;
+    out[i] += hp * gain * (0.75 + 0.25 * Math.sin(2 * Math.PI * 0.05 * t));
+  }
+  let t = 0.1;
+  while (t < out.length / RATE - 0.1) {
+    tone(out, t, 0.04, 1800 + r() * 2600, gain * (0.3 + r() * 0.6), { attack: 0.001, release: 0.035, partials: [[1, 1, 60]] });
+    t += 0.02 + r() * 0.12;
+  }
+}
+
+/** Tonnerre : grondement grave (bruit brun filtré fort, enveloppe longue). */
+function thunder(out, start, gain, seed) {
+  const r = rng(seed);
+  const s = Math.round(start * RATE);
+  const n = Math.round(5 * RATE);
+  let brown = 0;
+  let lp = 0;
+  for (let i = 0; i < n && s + i < out.length; i++) {
+    brown = (brown + (r() * 2 - 1) * 0.05) * 0.997;
+    lp += (brown - lp) * 0.03;
+    const t = i / RATE;
+    const env = Math.min(1, t / 0.08) * Math.exp(-t * 0.9) * (0.6 + 0.4 * Math.sin(t * 7 + r()));
+    out[s + i] += lp * gain * 14 * env;
+  }
+}
+
+/** Hurlement de loup : glissando avec vibrato et harmoniques. */
+function howl(out, start, gain, base = 330) {
+  const dur = 3.2;
+  const s = Math.round(start * RATE);
+  const n = Math.round(dur * RATE);
+  let phase = 0;
+  for (let i = 0; i < n && s + i < out.length; i++) {
+    const t = i / RATE;
+    const rise = t < 0.6 ? 0.75 + 0.25 * (t / 0.6) : t > 2.3 ? 1 - 0.3 * ((t - 2.3) / 0.9) : 1;
+    const f = base * rise * (1 + 0.012 * Math.sin(2 * Math.PI * 5.2 * t));
+    phase += (2 * Math.PI * f) / RATE;
+    const v = Math.sin(phase) + 0.35 * Math.sin(2 * phase) + 0.12 * Math.sin(3 * phase);
+    out[s + i] += v * gain * envelope(t, 0.35, 0.9, dur);
+  }
+}
+
 /** Fondu enchaîné fin → début pour une boucle sans clic. */
 function makeLoop(out, fade = 1.5) {
   const n = Math.round(fade * RATE);
@@ -160,7 +211,39 @@ function writeWav(name, data) {
   writeWav('ambient-day.wav', normalize(makeLoop(a), 0.55));
 }
 
+{
+  const a = buf(25.5);
+  rain(a, 0.35, 51);
+  wind(a, 0.3, 52, 0.05);
+  writeWav('ambient-rain.wav', normalize(makeLoop(a), 0.55));
+}
+{
+  const a = buf(25.5);
+  rain(a, 0.45, 61);
+  wind(a, 0.7, 62, 0.09);
+  thunder(a, 4.0, 0.9, 63);
+  thunder(a, 15.5, 0.7, 64);
+  writeWav('ambient-storm.wav', normalize(makeLoop(a), 0.6));
+}
+
 // --- Effets ---
+{
+  const a = buf(4);
+  howl(a, 0.1, 0.45, 330);
+  howl(a, 0.7, 0.25, 392);
+  wind(a, 0.15, 71, 0.2);
+  writeWav('sfx-howl.wav', normalize(a, 0.7));
+}
+{
+  const a = buf(6);
+  for (let k = 0; k < 3; k++) bell(a, k * 1.6, 293.66, 0.5, 3.6);
+  writeWav('sfx-bell.wav', normalize(a, 0.7));
+}
+{
+  const a = buf(1.6);
+  for (let k = 0; k < 3; k++) tone(a, k * 0.45, 0.3, 987.77, 0.5, { attack: 0.005, release: 0.2, partials: [[1, 1, 8], [2, 0.2, 10]] });
+  writeWav('sfx-timer.wav', normalize(a, 0.6));
+}
 {
   const a = buf(3);
   tone(a, 0, 3, 55, 0.5, { attack: 0.6, release: 1.6, partials: [[1, 1], [1.5, 0.35], [2.01, 0.25]] });
