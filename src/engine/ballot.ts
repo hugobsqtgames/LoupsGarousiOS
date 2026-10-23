@@ -95,7 +95,7 @@ export function requireOpenBallot(state: GameState): Ballot {
 
 /** Nombre de scrutins d'élimination (premier tour) déjà autorisés aujourd'hui. */
 export function eliminationAllowance(state: GameState): number {
-  return 1 + (state.judgeSecondVoteAvailable ? 1 : 0);
+  return 1 + (state.judgeSecondVoteAvailable ? 1 : 0) + state.extraVotesToday;
 }
 
 export function canOpenBallot(state: GameState, kind: BallotKind): string | null {
@@ -106,6 +106,7 @@ export function canOpenBallot(state: GameState, kind: BallotKind): string | null
   if (current && (current.status === 'open' || current.status === 'closed')) return 'Un scrutin est déjà en cours.';
   if (kind === 'mayor') {
     if (!state.setup.variants.mayorEnabled) return 'L’élection du maire est désactivée.';
+    if (state.mayorAbolished) return 'Le poste de maire a été perdu définitivement (Idiot du village).';
     if (state.mayorId) return 'Le village a déjà un maire.';
     if (state.eliminationsToday > 0) return 'Le vote d’élimination du jour a déjà eu lieu.';
     return null;

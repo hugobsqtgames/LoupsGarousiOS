@@ -2,6 +2,7 @@ import { deepClone } from './clone';
 import {
   cancelBallot,
   castVote,
+  countBallot,
   closeBallot,
   openBallot,
   openRunoff,
@@ -10,6 +11,8 @@ import {
   applyJudge,
 } from './ballot';
 import { assert, emit, fail } from './core';
+import { canDrawEvent, eventActive, firstEliminated, lastEliminated, spiritualist, getEventCard } from './events';
+import { effectiveWinCondition } from './roles/custom';
 import { killPlayers } from './deaths';
 import { rebuildNight, validateStepPayload } from './night/choices';
 import { resolveNight } from './night/resolve';
@@ -17,7 +20,7 @@ import { computeNightSteps } from './night/steps';
 import { initialUses, createInitialState } from './setup';
 import { activeBallot, findPlayer, getPlayer, registryOf } from './selectors';
 import { detectVictory } from './victory';
-import type { DecisionPayload, GameAction, GameSetup, GameState, PendingDecision, PlayerId } from './types';
+import type { BallotTarget, DecisionPayload, GameAction, GameSetup, GameState, PendingDecision, PlayerId, PlayerState } from './types';
 
 /* ------------------------------------------------------------------ */
 /* Transitions de phase                                                */
@@ -25,8 +28,11 @@ import type { DecisionPayload, GameAction, GameSetup, GameState, PendingDecision
 
 function closeAngelWindow(state: GameState): void {
   if (state.nightNumber < 2 && state.dayNumber < 2) return;
+  const reg = registryOf(state);
   for (const p of state.players) {
-    if (p.alive && p.roleId === 'ange' && p.team === 'solo') {
+    const def = reg.getCustom(p.roleId);
+    const firstRound = p.roleId === 'ange' || (def !== null && effectiveWinCondition(def) === 'first-round-death');
+    if (p.alive && firstRound && p.team === 'solo') {
       p.team = 'village';
       emit(state, { type: 'angel-now-villager', playerId: p.id }, true);
     }
@@ -55,6 +61,7 @@ function beginDay(state: GameState): void {
   state.phase = { kind: 'day', number: state.dayNumber };
   state.night = null;
   state.eliminationsToday = 0;
+  state.extraVotesToday = 0;
   state.judgeSecondVoteAvailable = false;
   state.activeBallotId = null;
   closeAngelWindow(state);
@@ -92,6 +99,12 @@ function eliminateByVote(state: GameState, playerId: PlayerId, viaScapegoat: boo
   if (!viaScapegoat && p.roleId === 'idiot' && !p.idiotRevealed && powers) {
     p.idiotRevealed = true;
     emit(state, { type: 'idiot-revealed', playerId: p.id });
+    // « Si l'Idiot était le Capitaine, le rôle de Capitaine est perdu définitivement. »
+    if (state.mayorId === p.id) {
+      state.mayorId = null;
+      state.mayorAbolished = true;
+      emit(state, { type: 'mayor-abolished', playerId: p.id });
+    }
     return;
   }
   if (!viaScapegoat && p.idiotRevealed && !state.setup.variants.idiotDiesSecondTime) {
@@ -170,20 +183,45 @@ function resolveDecision(state: GameState, decisionId: string, payload: Decision
       const victim = getPlayer(state, d.victimId);
       if (payload.accept) {
         const servant = getPlayer(state, d.servantId);
-        const reg = registryOf(state);
-        const taken = victim.roleId;
-        servant.roleId = taken;
-        servant.team = reg.get(taken).team;
-        servant.uses = initialUses(taken, reg);
-        servant.uses.servant = 0;
-        victim.roleId = 'servante';
-        emit(state, { type: 'servant', servantId: servant.id, victimId: victim.id, roleId: taken }, true);
+        takeOverRole(state, servant, victim);
       }
       const ballot = state.ballots.find((b) => b.id === d.ballotId);
       const viaScapegoat = ballot?.result?.outcome.kind === 'eliminated' && ballot.result.outcome.viaScapegoat === true;
       finishVoteDeath(state, victim.id, viaScapegoat);
       return;
     }
+  }
+}
+
+/**
+ * Servante dévouée : elle prend la carte de l'éliminé, dont le pouvoir est
+ * renouvelé et se joue « comme une première nuit » ; les effets appliqués à
+ * l'éliminé (charme, infection, titre de maire…) ne sont pas transmis. Si elle
+ * était charmée ou maire, elle ne l'est plus ; infectée, elle le reste.
+ * (Livret de l'extension Personnages, précisions sur la Servante dévouée.)
+ */
+function takeOverRole(state: GameState, servant: PlayerState, victim: PlayerState): void {
+  const reg = registryOf(state);
+  const taken = victim.roleId;
+  servant.roleId = taken;
+  servant.team = servant.infected ? 'wolves' : reg.get(taken).team;
+  servant.uses = initialUses(taken, reg);
+  servant.uses.servant = 0;
+  // L'Infect ne peut infecter que si personne ne l'a encore été.
+  if (taken === 'infect' && state.players.some((p) => p.infected)) servant.uses.infect = 0;
+  servant.charmed = false;
+  servant.transformed = servant.infected;
+  servant.wildChildModel = null;
+  servant.foxPowerLost = false;
+  servant.lastProtected = null;
+  servant.spiritCardsUsed = [];
+  servant.firstNight = state.nightNumber + 1;
+  // L'Ange repris ne gagne pas s'il est éliminé ensuite.
+  if (taken === 'ange') servant.team = servant.infected ? 'wolves' : 'village';
+  victim.roleId = 'servante';
+  emit(state, { type: 'servant', servantId: servant.id, victimId: victim.id, roleId: taken }, true);
+  if (state.mayorId === servant.id) {
+    state.pending.push({ id: `d${++state.idCounter}`, kind: 'mayor-succession', fromPlayerId: servant.id });
   }
 }
 
@@ -199,9 +237,32 @@ function requireNoPending(state: GameState): void {
   assert(state.pending.length === 0, 'pending', 'Des décisions sont en attente.');
 }
 
-function confirmBallot(state: GameState): void {
+function requireDayOrDawn(state: GameState): void {
+  assert(state.phase.kind === 'day' || state.phase.kind === 'dawn', 'mj-phase', 'Action possible à l’aube ou le jour.');
+}
+
+/**
+ * Saisie « mains levées » : fixe directement le nombre de voix anonymes pour
+ * une cible. Traduit en opérations +/− unitaires (traçabilité et plafond de
+ * votants conservés).
+ */
+function setAnonymousCount(state: GameState, target: BallotTarget, count: number): void {
+  assert(Number.isInteger(count) && count >= 0 && count <= 100, 'bad-count', 'Nombre de voix invalide.');
+  const b = activeBallot(state);
+  assert(b && b.status === 'open', 'no-open-ballot', 'Aucun scrutin ouvert.');
+  assert(b.mode === 'tally', 'tally-only', 'La saisie du nombre de mains levées concerne le mode compteur.');
+  const current = countBallot(b).anonymous[target] ?? 0;
+  for (let i = current; i < count; i++) castVote(state, target, null, false);
+  for (let i = current; i > count; i--) castVote(state, target, null, true);
+}
+
+function confirmBallot(state: GameState, spared: boolean): void {
   const b = activeBallot(state);
   assert(b && b.status === 'closed' && b.result, 'not-closed', 'Clôturez d’abord le scrutin.');
+  if (spared) {
+    assert(b.result.outcome.kind === 'eliminated', 'spare-outcome', 'Seul un condamné désigné par le vote peut être gracié.');
+    assert(eventActive(state, 'spare'), 'spare-event', 'Aucun événement ne permet de gracier le condamné aujourd’hui.');
+  }
   b.status = 'confirmed';
   state.activeBallotId = null;
   const outcome = b.result.outcome;
@@ -222,7 +283,11 @@ function confirmBallot(state: GameState): void {
       state.eliminationsToday += 1;
       return;
     case 'eliminated':
-      eliminateByVote(state, outcome.playerId, outcome.viaScapegoat === true, b.id);
+      if (spared) {
+        emit(state, { type: 'note', text: `${getPlayer(state, outcome.playerId).name} est gracié(e) (événement).` });
+      } else {
+        eliminateByVote(state, outcome.playerId, outcome.viaScapegoat === true, b.id);
+      }
       state.eliminationsToday += 1;
       return;
     case 'none':
@@ -299,7 +364,10 @@ export function applyAction(state: GameState, action: GameAction): void {
       break;
     case 'ballot/confirm':
       requireNoPending(state);
-      confirmBallot(state);
+      confirmBallot(state, action.spared === true);
+      break;
+    case 'ballot/set-count':
+      setAnonymousCount(state, action.target, action.count);
       break;
     case 'ballot/cancel':
       cancelBallot(state);
@@ -317,6 +385,79 @@ export function applyAction(state: GameState, action: GameAction): void {
       const p = findPlayer(state, action.playerId);
       assert(p && p.alive, 'dead-target', 'Joueur introuvable ou déjà éliminé.');
       killPlayers(state, [{ playerId: p.id, cause: 'mj' }]);
+      break;
+    }
+    case 'mj/revive': {
+      requireNoVictory(state);
+      requireDayOrDawn(state);
+      const p = findPlayer(state, action.playerId);
+      assert(p && !p.alive, 'revive-alive', 'Seul un joueur éliminé peut revenir en jeu.');
+      p.alive = true;
+      p.death = null;
+      if (action.asVillager) {
+        p.roleId = 'villageois';
+        p.team = 'village';
+        p.uses = {};
+        p.transformed = false;
+        p.infected = false;
+      }
+      emit(state, { type: 'revived', playerId: p.id, roleId: p.roleId });
+      if (state.lovers && state.lovers.includes(p.id)) {
+        const other = getPlayer(state, state.lovers[0] === p.id ? state.lovers[1] : state.lovers[0]);
+        if (!other.alive) {
+          state.lovers = null;
+          emit(state, { type: 'note', text: `${p.name} n’est plus lié(e) à un Amoureux mort.` }, true);
+        }
+      }
+      break;
+    }
+    case 'mj/set-team': {
+      requireNoVictory(state);
+      requireDayOrDawn(state);
+      const p = findPlayer(state, action.playerId);
+      assert(p && p.alive, 'dead-target', 'Joueur introuvable ou éliminé.');
+      assert(action.team === 'village' || action.team === 'wolves', 'bad-team', 'Camp invalide.');
+      assert(p.team !== action.team, 'same-team', `${p.name} est déjà dans ce camp.`);
+      p.team = action.team;
+      p.transformed = action.team === 'wolves';
+      emit(state, { type: 'team-changed', playerId: p.id, team: action.team }, true);
+      break;
+    }
+    case 'mj/grant-use': {
+      requireNoVictory(state);
+      requireDayOrDawn(state);
+      const p = findPlayer(state, action.playerId);
+      assert(p && p.alive, 'dead-target', 'Joueur introuvable ou éliminé.');
+      const roleFor = { heal: 'sorciere', poison: 'sorciere', shot: 'chasseur' } as const;
+      assert(action.key in roleFor && p.roleId === roleFor[action.key], 'grant-role', 'Ce pouvoir ne correspond pas au rôle du joueur.');
+      assert((p.uses[action.key] ?? 0) === 0, 'grant-available', 'Ce pouvoir est encore disponible.');
+      p.uses = { ...p.uses, [action.key]: 1 };
+      emit(state, { type: 'use-granted', playerId: p.id, key: action.key }, true);
+      break;
+    }
+    case 'mj/extra-vote':
+      requireNoVictory(state);
+      assert(state.phase.kind === 'day', 'not-day', 'Ce n’est pas le jour.');
+      state.extraVotesToday += 1;
+      emit(state, { type: 'extra-vote' });
+      break;
+    case 'mj/remove-mayor':
+      requireNoVictory(state);
+      assert(state.phase.kind === 'day', 'not-day', 'Ce n’est pas le jour.');
+      assert(state.mayorId, 'no-mayor', 'Le village n’a pas de maire.');
+      assert(!activeBallot(state) || activeBallot(state)?.status === 'confirmed' || activeBallot(state)?.status === 'cancelled', 'ballot-open', 'Un scrutin est en cours.');
+      state.mayorId = null;
+      emit(state, { type: 'mayor', playerId: null, how: 'removed' });
+      break;
+    case 'event/draw': {
+      requireNoVictory(state);
+      const reason = canDrawEvent(state, action.cardId);
+      assert(reason === null, 'event-draw', reason ?? '');
+      state.events.push({ cardId: action.cardId, day: state.dayNumber, nightsBefore: state.nightNumber, actionIndex: state.actionCount });
+      emit(state, { type: 'event-drawn', cardId: action.cardId, day: state.dayNumber, readerId: lastEliminated(state) });
+      if (getEventCard(action.cardId)?.automation.includes('spiritualism')) {
+        emit(state, { type: 'spiritualism', source: 'event', askerId: spiritualist(state), answererId: firstEliminated(state), card: null, question: null });
+      }
       break;
     }
     case 'mj/note':

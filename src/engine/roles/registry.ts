@@ -1,6 +1,6 @@
 import type { BuiltinRoleId, CustomRoleDef, RoleId } from '../types';
 import { BUILTIN_ROLES, type RoleDefinition } from './catalog';
-import { CUSTOM_ACTION_LABELS, CUSTOM_ON_DEATH_LABELS, CUSTOM_SCHEDULE_LABELS } from './custom';
+import { CUSTOM_ACTION_LABELS, CUSTOM_ON_DEATH_LABELS, CUSTOM_SCHEDULE_LABELS, CUSTOM_WIN_LABELS, effectiveWinCondition } from './custom';
 
 export function isCustomRoleId(id: string): id is `custom:${string}` {
   return id.startsWith('custom:');
@@ -22,7 +22,7 @@ export function customToDefinition(def: CustomRoleDef): RoleDefinition {
     targets: def.canTargetSelf ? 'Un joueur vivant (lui compris)' : 'Un autre joueur vivant',
     effectDuration: def.nightAction === 'protect' ? 'La nuit en cours' : 'Immédiat',
     onDeath: CUSTOM_ON_DEATH_LABELS[def.onDeath],
-    restrictions: [],
+    restrictions: [`Victoire : ${CUSTOM_WIN_LABELS[effectiveWinCondition(def)]}.`],
     interactions: def.nightAction === 'kill' ? ['Attaque bloquée par le Salvateur et les protections personnalisées.'] : [],
     nightOrder: def.nightAction === 'none' ? null : def.wakeOrder,
     nightStep: def.nightAction === 'none' ? null : 'custom',

@@ -1,4 +1,5 @@
 import { BUILTIN_ROLE_LIST, COMEDIAN_ALLOWED } from './roles/catalog';
+import { effectiveWinCondition } from './roles/custom';
 import { RoleRegistry, isCustomRoleId } from './roles/registry';
 import { checkVariants } from './variants';
 import type { BuiltinRoleId, GameSetup, GameState, PlayerState, RoleId } from './types';
@@ -150,6 +151,19 @@ export function validateSetup(setup: GameSetup): SetupIssue[] {
   if (assigned.includes('grand-mechant-loup') && assigned.includes('infect') && n < 12) {
     issues.push({ level: 'warning', code: 'strong-wolves', message: 'Grand Méchant Loup + Infect dans une petite partie : loups très avantagés.' });
   }
+  for (const def of setup.customRoles) {
+    if (!assigned.includes(def.id)) continue;
+    const win = effectiveWinCondition(def);
+    if (win === 'opposite-group') {
+      const groups = setup.sectGroups ?? {};
+      if (setup.players.some((p) => groups[p.id] !== 'A' && groups[p.id] !== 'B')) {
+        issues.push({ level: 'error', code: 'custom-groups', message: `${def.name} : définissez les deux groupes (comme pour l’Abominable sectaire).` });
+      }
+    }
+  }
+  if (assigned.includes('gitane') && !setup.variants.newMoonEvents) {
+    issues.push({ level: 'warning', code: 'gypsy-cards', message: 'La Gitane utilise les 5 cartes Spiritisme de l’extension Nouvelle Lune : gardez-les à portée de main.' });
+  }
   if (assigned.includes('sectaire')) {
     const groups = setup.sectGroups ?? {};
     const missing = setup.players.filter((p) => groups[p.id] !== 'A' && groups[p.id] !== 'B');
@@ -182,6 +196,8 @@ export function initialUses(roleId: RoleId, reg: RoleRegistry): Record<string, n
       return { judge: 1 };
     case 'servante':
       return { servant: 1 };
+    case 'gitane':
+      return { spirit: 5 };
     default: {
       const c = reg.getCustom(roleId);
       if (!c) return {};
@@ -214,6 +230,9 @@ export function makePlayerState(id: string, name: string, seat: number, roleId: 
     lastProtected: null,
     wildChildModel: null,
     comedianRole: null,
+    firstNight: 1,
+    markedBy: [],
+    spiritCardsUsed: [],
   };
 }
 
@@ -232,6 +251,10 @@ export function createInitialState(setup: GameSetup): GameState {
     lovers: null,
     mayorId: null,
     mayorEverElected: false,
+    mayorAbolished: false,
+    events: [],
+    extraVotesToday: 0,
+    spiritQuestion: null,
     night: null,
     dawnReport: [],
     ballots: [],

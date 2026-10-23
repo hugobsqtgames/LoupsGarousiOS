@@ -18,7 +18,7 @@ describe('catalogue et rôles personnalisés', () => {
     await waitFor(() => expect(screen.queryByTestId('catalog-voyante')).toBeNull());
     await fireEvent.press(await screen.findByTestId('catalog-sorciere'));
     expect(await screen.findByText('Sources')).toBeTruthy();
-    expect(screen.getByText(/Règle officielle confirmée/)).toBeTruthy();
+    expect(screen.getByText(/Règle officielle \(livret consulté\)/)).toBeTruthy();
     await fireEvent.press(screen.getByTestId('toggle-favorite'));
     await waitFor(() => expect(useAppStore.getState().settings.favoriteRoles).toEqual(['sorciere']));
   });

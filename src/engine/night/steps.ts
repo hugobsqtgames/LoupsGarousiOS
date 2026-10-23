@@ -1,6 +1,6 @@
 import { NIGHT_ORDER } from '../roles/catalog';
 import { customWakesOnNight } from '../roles/custom';
-import { aWolfHasDied, alivePlayers, effectiveRole, hasPowers, isWolfSide, registryOf } from '../selectors';
+import { alivePlayers, bigBadWolfBlocked, effectiveRole, hasPowers, isWolfSide, registryOf, whiteWolfNight } from '../selectors';
 import type { GameState, PlayerId, PlayerState, RoleId, StepKind, StepPayload } from '../types';
 
 /** Une étape du guide de nuit, recalculée à chaque modification. */
@@ -19,7 +19,7 @@ export interface NightStep {
 
 const IMMEDIATE: ReadonlySet<StepKind> = new Set<StepKind>(['thief', 'comedian', 'wolfhound', 'cupid', 'wild-child']);
 
-const FIRST_NIGHT_ONLY: ReadonlySet<StepKind> = new Set<StepKind>(['thief', 'wolfhound', 'cupid', 'lovers', 'wild-child', 'sisters', 'brothers']);
+const FIRST_NIGHT_ONLY: ReadonlySet<StepKind> = new Set<StepKind>(['thief', 'wolfhound', 'cupid', 'lovers', 'wild-child', 'sisters', 'brothers', 'judge', 'bear-tamer']);
 
 /** Rôle principal associé à chaque étape (pour les appels « pour la forme »). */
 const STEP_ROLE: Partial<Record<StepKind, RoleId>> = {
@@ -37,6 +37,7 @@ const STEP_ROLE: Partial<Record<StepKind, RoleId>> = {
   'white-wolf': 'loup-blanc',
   'big-bad-wolf': 'grand-mechant-loup',
   witch: 'sorciere',
+  gypsy: 'gitane',
   piper: 'joueur-de-flute',
   raven: 'corbeau',
 };
@@ -96,19 +97,32 @@ export function computeNightSteps(state: GameState): NightStep[] {
     const comedians = state.players.filter((p) => p.roleId === 'comedien' && hasPowers(state, p));
     if (night.startComedianCards.length > 0) perActor('comedian', 'comedien', comedians);
   }
-  if (n === 1) {
-    perActor('wolfhound', 'chien-loup', byRole(state, 'chien-loup').filter((p) => p.alive));
-    perActor('cupid', 'cupidon', activeActors(state, 'cupidon'));
-    if (state.lovers) {
-      const lovers = state.players.filter((p) => state.lovers?.includes(p.id) && p.alive);
-      push('lovers', lovers, 'lovers', null, NIGHT_ORDER.lovers);
-    }
-    perActor('wild-child', 'enfant-sauvage', byRole(state, 'enfant-sauvage').filter((p) => p.alive && p.team === 'village'));
-    const sisters = byRole(state, 'deux-soeurs').filter((p) => p.alive);
-    if (sisters.length > 0) push('sisters', sisters, 'sisters', 'deux-soeurs', NIGHT_ORDER.sisters);
-    const brothers = byRole(state, 'trois-freres').filter((p) => p.alive);
-    if (brothers.length > 0) push('brothers', brothers, 'brothers', 'trois-freres', NIGHT_ORDER.brothers);
+  // Rôles joués « comme une première nuit » : nuit 1, ou nuit suivant la reprise par la Servante.
+  const firstNightOf = (roleId: RoleId) => byRole(state, roleId).filter((p) => p.alive && p.firstNight === n);
+  perActor('wolfhound', 'chien-loup', firstNightOf('chien-loup'));
+  const couplePossible = !state.lovers || night.startLovers === null || !state.players.some((p) => night.startLovers?.includes(p.id) && p.alive);
+  const cupids = activeActors(state, 'cupidon').filter((p) => p.firstNight === n && (n === 1 || couplePossible));
+  perActor('cupid', 'cupidon', cupids);
+  if (state.lovers && (n === 1 || cupids.length > 0)) {
+    const lovers = state.players.filter((p) => state.lovers?.includes(p.id) && p.alive);
+    push('lovers', lovers, 'lovers', null, NIGHT_ORDER.lovers);
   }
+  const judges = activeActors(state, 'juge-begue').filter((p) => p.firstNight === n);
+  if (judges.length > 0) push('judge', judges, 'judge', 'juge-begue', NIGHT_ORDER.judge);
+  const siblingsNight = (roleId: RoleId) => {
+    const all = byRole(state, roleId).filter((p) => p.alive);
+    if (all.length === 0) return [];
+    if (n === 1 || all.some((p) => p.firstNight === n)) return all;
+    if (state.setup.variants.siblingsWakeLater && n % 2 === 0 && all.length > 1) return all;
+    return [];
+  };
+  const sisters = siblingsNight('deux-soeurs');
+  if (sisters.length > 0) push('sisters', sisters, 'sisters', 'deux-soeurs', NIGHT_ORDER.sisters);
+  const brothers = siblingsNight('trois-freres');
+  if (brothers.length > 0) push('brothers', brothers, 'brothers', 'trois-freres', NIGHT_ORDER.brothers);
+  perActor('wild-child', 'enfant-sauvage', firstNightOf('enfant-sauvage').filter((p) => p.team === 'village'));
+  const tamers = byRole(state, 'montreur-ours').filter((p) => p.alive && p.firstNight === n);
+  if (tamers.length > 0) push('bear-tamer', tamers, 'bear-tamer', 'montreur-ours', NIGHT_ORDER['bear-tamer']);
 
   perActor('salvateur', 'salvateur', activeActors(state, 'salvateur'));
   perActor('seer', 'voyante', activeActors(state, 'voyante'));
@@ -118,8 +132,8 @@ export function computeNightSteps(state: GameState): NightStep[] {
   if (wolves.length > 0) push('wolves', wolves, 'wolves', 'loup-garou', NIGHT_ORDER.wolves);
 
   perActor('infect', 'infect', state.players.filter((p) => p.roleId === 'infect' && p.alive && p.team === 'wolves' && (p.uses.infect ?? 0) > 0));
-  if (n % 2 === 0) perActor('white-wolf', 'loup-blanc', state.players.filter((p) => p.roleId === 'loup-blanc' && p.alive));
-  if (!aWolfHasDied(state)) {
+  if (whiteWolfNight(state, n)) perActor('white-wolf', 'loup-blanc', state.players.filter((p) => p.roleId === 'loup-blanc' && p.alive && (p.firstNight === 1 || n > p.firstNight)));
+  if (!bigBadWolfBlocked(state)) {
     perActor('big-bad-wolf', 'grand-mechant-loup', state.players.filter((p) => p.roleId === 'grand-mechant-loup' && p.alive && p.team === 'wolves'));
   }
   perActor(
@@ -127,6 +141,7 @@ export function computeNightSteps(state: GameState): NightStep[] {
     'sorciere',
     activeActors(state, 'sorciere').filter((p) => (p.uses.heal ?? 0) > 0 || (p.uses.poison ?? 0) > 0),
   );
+  perActor('gypsy', 'gitane', activeActors(state, 'gitane').filter((p) => (p.uses.spirit ?? 0) > 0));
   const pipers = activeActors(state, 'joueur-de-flute');
   perActor('piper', 'joueur-de-flute', pipers);
   if (pipers.length > 0) {
@@ -152,9 +167,9 @@ export function computeNightSteps(state: GameState): NightStep[] {
       if (covered.has(kind)) continue;
       if (!composition.has(roleId)) continue;
       if (FIRST_NIGHT_ONLY.has(kind) && n !== 1) continue;
-      if (kind === 'white-wolf' && n % 2 !== 0) continue;
+      if (kind === 'white-wolf' && !whiteWolfNight(state, n)) continue;
       if (kind === 'comedian' && night.startComedianCards.length === 0) continue;
-      if (kind === 'big-bad-wolf' && aWolfHasDied(state)) continue;
+      if (kind === 'big-bad-wolf' && bigBadWolfBlocked(state)) continue;
       const key = `bluff:${roleId}`;
       steps.push({ key, kind: 'bluff', roleId, actorIds: [], bluff: true, order: NIGHT_ORDER[kind as keyof typeof NIGHT_ORDER], immediate: false, payload: night.choices[key] });
     }

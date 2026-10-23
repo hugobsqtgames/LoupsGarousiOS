@@ -29,7 +29,12 @@ export interface Draft {
   thiefCards: [RoleId, RoleId];
   /** Trois cartes du Comédien. */
   comedianCards: RoleId[];
-  assignMode: 'random' | 'manual';
+  /**
+   * random : l'app tire les rôles, le MJ distribue les cartes physiques ;
+   * phone : l'app tire les rôles et chaque joueur découvre le sien sur le téléphone ;
+   * manual : le MJ saisit les cartes physiques reçues.
+   */
+  assignMode: 'random' | 'manual' | 'phone';
   assignments: Record<PlayerId, RoleId>;
   variants: Variants;
   sectGroups: Record<PlayerId, 'A' | 'B'>;
@@ -53,7 +58,7 @@ export function emptyDraft(variants: Variants = DEFAULT_VARIANTS, seed = Date.no
     sectGroups: {},
     seed,
     complexity: 'equilibre',
-    expansions: ['base', 'nouvelle-lune', 'personnages'],
+    expansions: ['base', 'nouvelle-lune', 'le-village', 'personnages'],
     allowSolo: false,
     explanations: [],
   };
@@ -98,6 +103,46 @@ export function randomAssignments(players: SetupPlayer[], roles: RoleId[], seed:
   return out;
 }
 
+export interface Deal {
+  assignments: Record<PlayerId, RoleId>;
+  /** Deux cartes laissées au centre pour le Voleur (vide si le Voleur n'est pas distribué). */
+  centerCards: RoleId[];
+}
+
+/** Cartes que l'application laisse toujours à un joueur (jamais au centre). */
+const NEVER_CENTER = new Set<RoleId>(['voleur', 'comedien', 'deux-soeurs', 'trois-freres']);
+
+/**
+ * Distribution officielle avec le Voleur : on ajoute deux cartes au paquet,
+ * on mélange, on distribue une carte par joueur et les deux restantes vont au
+ * centre (règle du jeu de base). Limite de l'application : le Voleur, le
+ * Comédien, les Sœurs et les Frères sont toujours distribués à un joueur
+ * (une carte de ce type tirée au centre est échangée avec celle d'un joueur).
+ */
+export function dealCards(players: SetupPlayer[], roles: RoleId[], thiefCards: readonly RoleId[], seed: number): Deal {
+  if (!roles.includes('voleur')) return { assignments: randomAssignments(players, roles, seed), centerCards: [] };
+  const rng = createRng(seed);
+  const deck = shuffle([...roles, ...thiefCards], rng);
+  const n = players.length;
+  for (let c = n; c < deck.length; c++) {
+    if (!NEVER_CENTER.has(deck[c])) continue;
+    const swap = deck.findIndex((r, i) => i < n && !NEVER_CENTER.has(r));
+    if (swap >= 0) [deck[c], deck[swap]] = [deck[swap], deck[c]];
+  }
+  const assignments: Record<PlayerId, RoleId> = {};
+  players.forEach((p, i) => {
+    if (deck[i]) assignments[p.id] = deck[i];
+  });
+  return { assignments, centerCards: deck.slice(n, n + 2) };
+}
+
+/** Tirage effectif du brouillon (aperçu identique à la partie lancée). */
+export function draftDeal(d: Draft): Deal {
+  const roles = rolesFromCounts(d.roleCounts);
+  if (d.assignMode === 'manual') return { assignments: d.assignments, centerCards: roles.includes('voleur') ? [...d.thiefCards] : [] };
+  return dealCards(d.players, roles, d.thiefCards, d.seed);
+}
+
 /** Cartes hors jeu effectives : Voleur (2) puis Comédien (3), selon les rôles présents. */
 export function extraCardsOf(d: Draft): RoleId[] {
   const roles = rolesFromCounts(d.roleCounts);
@@ -113,8 +158,10 @@ export function defaultComedianCards(roles: readonly RoleId[]): RoleId[] {
 
 export function buildSetup(d: Draft, id: string, now: string, customRoles: CustomRoleDef[]): GameSetup {
   const roles = rolesFromCounts(d.roleCounts);
-  const assignments = d.assignMode === 'random' ? randomAssignments(d.players, roles, d.seed) : d.assignments;
-  const extraCards = extraCardsOf(d);
+  const deal = draftDeal(d);
+  const assignments = deal.assignments;
+  const dealt = d.players.map((p) => assignments[p.id]);
+  const extraCards = [...(dealt.includes('voleur') ? deal.centerCards : []), ...(dealt.includes('comedien') ? d.comedianCards.slice(0, 3) : [])];
   const used = new Set<RoleId>([...roles, ...extraCards]);
   return {
     formatVersion: 1,
@@ -126,8 +173,15 @@ export function buildSetup(d: Draft, id: string, now: string, customRoles: Custo
     extraCards,
     variants: d.variants,
     customRoles: customRoles.filter((c) => used.has(c.id)),
-    sectGroups: roles.includes('sectaire') ? Object.fromEntries(d.players.map((p, i) => [p.id, d.sectGroups[p.id] ?? (i % 2 === 0 ? 'A' : 'B')])) : undefined,
+    sectGroups: needsGroups(roles, customRoles) ? Object.fromEntries(d.players.map((p, i) => [p.id, d.sectGroups[p.id] ?? (i % 2 === 0 ? 'A' : 'B')])) : undefined,
+    ...(d.assignMode === 'phone' ? { dealMode: 'phone' as const } : {}),
   };
+}
+
+/** Deux groupes nécessaires : Abominable sectaire ou rôle personnalisé « groupe opposé ». */
+export function needsGroups(roles: readonly RoleId[], customRoles: readonly CustomRoleDef[]): boolean {
+  if (roles.includes('sectaire')) return true;
+  return customRoles.some((c) => roles.includes(c.id) && c.winCondition === 'opposite-group');
 }
 
 /** Problèmes de configuration, avec ceux propres à l'assistant. */

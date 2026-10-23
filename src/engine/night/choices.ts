@@ -62,7 +62,20 @@ export function validateStepPayload(state: GameState, step: NightStep, payload: 
     case 'sisters':
     case 'brothers':
     case 'charmed':
+    case 'judge':
+    case 'bear-tamer':
       return;
+    case 'gypsy': {
+      const asker = aliveTarget(state, payload.target, 'Gitane');
+      if (!asker) return;
+      assert(actor && (actor.uses.spirit ?? 0) > 0, 'gypsy-no-card', 'Il ne reste plus de carte Spiritisme.');
+      const cardNo = payload.cardIndex ?? null;
+      assert(cardNo !== null && Number.isInteger(cardNo) && cardNo >= 1 && cardNo <= 5, 'gypsy-card', 'Choisissez la carte Spiritisme (1 à 5).');
+      assert(!actor.spiritCardsUsed.includes(cardNo), 'gypsy-card-used', `La carte Spiritisme n° ${cardNo} a déjà été utilisée.`);
+      const q = payload.question ?? null;
+      assert(q !== null && Number.isInteger(q) && q >= 1 && q <= 4, 'gypsy-question', 'Choisissez la question (1 à 4).');
+      return;
+    }
     case 'thief': {
       const cards = state.setup.extraCards.slice(0, 2);
       const idx = payload.cardIndex ?? null;

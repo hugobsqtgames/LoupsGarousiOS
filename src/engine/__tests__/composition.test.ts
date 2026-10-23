@@ -3,7 +3,7 @@ import { setupErrors } from '../setup';
 import { makeSetup } from '../testing';
 import type { Expansion } from '../types';
 
-const ALL: Expansion[] = ['base', 'nouvelle-lune', 'personnages'];
+const ALL: Expansion[] = ['base', 'nouvelle-lune', 'le-village', 'personnages'];
 
 describe('composition automatique', () => {
   it('respecte la table des loups', () => {

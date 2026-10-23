@@ -101,3 +101,47 @@ export function replaceAction(record: GameRecord, index: number, action: GameAct
   }
   return { ok: true, record: r, state: res.state };
 }
+
+/**
+ * Lecture pas à pas d'une partie (rejeu « magnétoscope ») : l'état après
+ * `k` actions est recalculé depuis le point de contrôle le plus proche.
+ */
+export class ReplayCursor {
+  private readonly cache = new Map<number, GameState>();
+  private readonly every: number;
+  readonly record: GameRecord;
+
+  constructor(record: GameRecord, every = 15) {
+    this.record = record;
+    this.every = every;
+    this.cache.set(0, startGame(record.setup));
+  }
+
+  get length(): number {
+    return this.record.actions.length;
+  }
+
+  /** État après `k` actions (0 = début de partie). Lève une erreur si l'historique est incohérent. */
+  stateAt(k: number): GameState {
+    const target = Math.max(0, Math.min(k, this.length));
+    let base = 0;
+    for (const key of this.cache.keys()) if (key <= target && key > base) base = key;
+    let state = this.cache.get(base)!;
+    for (let i = base; i < target; i++) {
+      const next = cloneState(state);
+      applyAction(next, this.record.actions[i].action);
+      state = next;
+      if ((i + 1) % this.every === 0) this.cache.set(i + 1, state);
+    }
+    return state;
+  }
+
+  /** Indices des actions qui ouvrent une nouvelle phase (pour sauter de phase en phase). */
+  phaseStarts(): number[] {
+    const out = [0];
+    this.record.actions.forEach((a, i) => {
+      if (a.action.type === 'night/resolve' || a.action.type === 'dawn/confirm' || a.action.type === 'day/end') out.push(i + 1);
+    });
+    return [...new Set(out)];
+  }
+}

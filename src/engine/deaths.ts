@@ -1,6 +1,13 @@
 import { emit, nextId } from './core';
 import { firstWolfToLeft, getPlayer, loverOf, phaseLabel, registryOf } from './selectors';
-import type { DeathCause, GameState, PlayerId, PlayerState } from './types';
+import { effectiveWinCondition } from './roles/custom';
+import type { RoleRegistry } from './roles/registry';
+import type { CustomWinCondition, DeathCause, GameState, PlayerId, PlayerState, RoleId } from './types';
+
+function custom0(reg: RoleRegistry, roleId: RoleId): CustomWinCondition | null {
+  const def = reg.getCustom(roleId);
+  return def ? effectiveWinCondition(def) : null;
+}
 
 export interface DeathRequest {
   playerId: PlayerId;
@@ -51,7 +58,9 @@ export function killPlayers(state: GameState, requests: DeathRequest[]): void {
     p.death = { cause: req.cause, phaseLabel: phaseLabel(state.phase), actionIndex: state.actionCount };
     emit(state, { type: 'death', playerId: p.id, cause: req.cause, roleId: p.roleId });
 
-    if (p.roleId === 'ange' && p.team === 'solo' && state.angelVictory === null && angelWindowOpen(state, req.cause)) {
+    // Ange (ou rôle personnalisé « éliminé au premier tour ») : un Amoureux renonce à cet objectif.
+    const firstRoundWinner = p.roleId === 'ange' || (custom0(reg, p.roleId) === 'first-round-death');
+    if (firstRoundWinner && p.team === 'solo' && state.angelVictory === null && !loverOf(state, p.id) && angelWindowOpen(state, req.cause)) {
       state.angelVictory = p.id;
     }
 
@@ -79,10 +88,18 @@ export function killPlayers(state: GameState, requests: DeathRequest[]): void {
     if (p.roleId === 'ancien' && p.team === 'village' && elderVengeanceApplies(state, req.cause) && !state.villagePowersLost) {
       state.villagePowersLost = true;
       emit(state, { type: 'elder-vengeance', playerId: p.id });
+      if (state.setup.variants.elderTakesIdiot) {
+        for (const idiot of state.players) if (idiot.alive && idiot.idiotRevealed) queue.push({ playerId: idiot.id, cause: 'vote' });
+      }
     }
 
     if (p.roleId === 'chevalier' && active && WOLF_CAUSES.has(req.cause) && req.cause !== 'white-wolf') {
-      const wolf = firstWolfToLeft(state, p.id);
+      // « Parmi les loups responsables de cette élimination, le premier assis à sa gauche. »
+      const guilty =
+        req.cause === 'big-bad-wolf'
+          ? new Set(state.players.filter((w) => w.alive && w.roleId === 'grand-mechant-loup').map((w) => w.id))
+          : undefined;
+      const wolf = firstWolfToLeft(state, p.id, guilty);
       if (wolf) {
         state.rustyCurse = { wolfId: wolf.id, night: state.nightNumber + 1 };
         emit(state, { type: 'rusty-curse', wolfId: wolf.id }, true);

@@ -1,4 +1,5 @@
-import { findPlayer, hasPowers, isWolfSide } from './selectors';
+import { effectiveWinCondition } from './roles/custom';
+import { findPlayer, hasPowers, isWolfSide, registryOf } from './selectors';
 import type { GameState, PlayerId, PlayerState, Victory } from './types';
 
 type Side = 'wolves' | 'village' | 'white-wolf' | 'solo';
@@ -19,7 +20,13 @@ export function detectVictory(state: GameState): Victory | null {
   const alive = state.players.filter((p) => p.alive);
   const ids = (ps: PlayerState[]): PlayerId[] => ps.map((p) => p.id);
 
+  const reg = registryOf(state);
   if (state.angelVictory) {
+    const angel = findPlayer(state, state.angelVictory);
+    if (angel && angel.roleId !== 'ange' && reg.getCustom(angel.roleId)) {
+      const def = reg.get(angel.roleId);
+      return { winner: 'custom', customRoleId: angel.roleId, winners: [angel.id], reason: `${def.name} a été éliminé(e) dès le premier tour.` };
+    }
     return { winner: 'angel', winners: [state.angelVictory], reason: 'L’Ange a été éliminé dès le premier tour.' };
   }
   if (alive.length === 0) {
@@ -29,6 +36,23 @@ export function detectVictory(state: GameState): Victory | null {
   const piper = alive.find((p) => p.roleId === 'joueur-de-flute' && p.team === 'solo' && hasPowers(state, p));
   if (piper && alive.every((p) => p.id === piper.id || p.charmed)) {
     return { winner: 'piper', winners: [piper.id], reason: 'Tous les survivants sont charmés.' };
+  }
+
+  // Rôles personnalisés solitaires (conditions calquées sur les rôles officiels).
+  for (const p of alive) {
+    if (p.team !== 'solo') continue;
+    const def = reg.getCustom(p.roleId);
+    if (!def) continue;
+    const win = effectiveWinCondition(def);
+    const done = (reason: string): Victory => ({ winner: 'custom', customRoleId: p.roleId, winners: [p.id], reason });
+    if (win === 'last-survivor' && alive.length === 1) return done(`${def.name} est le dernier survivant.`);
+    if (win === 'all-marked' && hasPowers(state, p) && alive.every((o) => o.id === p.id || o.markedBy.includes(p.id))) {
+      return done(`Tous les survivants ont été marqués par ${def.name}.`);
+    }
+    if (win === 'opposite-group' && state.setup.sectGroups) {
+      const own = state.setup.sectGroups[p.id];
+      if (own && alive.every((o) => state.setup.sectGroups?.[o.id] === own)) return done('Tout le groupe opposé a été éliminé.');
+    }
   }
 
   const sectarian = alive.find((p) => p.roleId === 'sectaire' && p.team === 'solo');

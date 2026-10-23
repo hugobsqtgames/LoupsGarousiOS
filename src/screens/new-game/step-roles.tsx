@@ -16,8 +16,8 @@ import { useAppStore } from '@/state/app-store';
 import { useTheme } from '@/theme/theme-context';
 import { spacing, teamColor } from '@/theme/themes';
 
-const EXPANSIONS: Expansion[] = ['base', 'nouvelle-lune', 'personnages', 'custom'];
-const SHORT_EXPANSION: Record<Expansion, string> = { base: 'Base', 'nouvelle-lune': 'N. Lune', personnages: 'Perso', custom: 'Créés' };
+const EXPANSIONS: Expansion[] = ['base', 'nouvelle-lune', 'le-village', 'personnages', 'custom'];
+const SHORT_EXPANSION: Record<Expansion, string> = { base: 'Base', 'nouvelle-lune': 'N. Lune', 'le-village': 'Village', personnages: 'Perso', custom: 'Créés' };
 
 function RoleCountRow({ role, count, onChange, favorite }: { role: RoleDefinition; count: number; onChange: (n: number) => void; favorite: boolean }) {
   const { colors } = useTheme();
@@ -115,7 +115,7 @@ export function StepRoles() {
           testID="complexity"
         />
         <View style={styles.wrap}>
-          {(['base', 'nouvelle-lune', 'personnages'] as Expansion[]).map((e) => {
+          {(['base', 'nouvelle-lune', 'le-village', 'personnages'] as Expansion[]).map((e) => {
             const on = draft.expansions.includes(e);
             return (
               <Button

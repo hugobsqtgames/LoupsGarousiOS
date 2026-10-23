@@ -1,4 +1,4 @@
-import type { CustomNightAction, CustomOnDeath, CustomRoleDef, CustomSchedule, Team } from '../types';
+import type { CustomNightAction, CustomOnDeath, CustomRoleDef, CustomSchedule, CustomWinCondition, Team } from '../types';
 
 /**
  * Rôles personnalisés : définition purement déclarative.
@@ -10,13 +10,29 @@ export const CUSTOM_ACTIONS: readonly CustomNightAction[] = ['none', 'inspect', 
 export const CUSTOM_SCHEDULES: readonly CustomSchedule[] = ['every_night', 'first_night', 'even_nights', 'odd_nights'];
 export const CUSTOM_ON_DEATH: readonly CustomOnDeath[] = ['none', 'shoot'];
 const TEAMS: readonly Team[] = ['village', 'wolves', 'solo'];
+export const CUSTOM_WIN_CONDITIONS: readonly CustomWinCondition[] = ['camp', 'last-survivor', 'all-marked', 'first-round-death', 'opposite-group'];
+
+/** Conditions de victoire calquées sur les rôles officiels (entre parenthèses : le modèle). */
+export const CUSTOM_WIN_LABELS: Record<CustomWinCondition, string> = {
+  camp: 'Gagne avec son camp (comme un Villageois ou un Loup-Garou)',
+  'last-survivor': 'Seul survivant (comme le Loup-Garou blanc)',
+  'all-marked': 'Tous les autres survivants marqués par lui (comme le Joueur de flûte)',
+  'first-round-death': 'Éliminé au premier tour, sinon devient villageois (comme l’Ange)',
+  'opposite-group': 'Tout le groupe opposé éliminé (comme l’Abominable sectaire)',
+};
+
+/** Condition effective (les anciens rôles n'en avaient pas). */
+export function effectiveWinCondition(def: Pick<CustomRoleDef, 'team' | 'winCondition'>): CustomWinCondition {
+  if (def.winCondition) return def.winCondition;
+  return def.team === 'solo' ? 'last-survivor' : 'camp';
+}
 
 export const CUSTOM_ACTION_LABELS: Record<CustomNightAction, string> = {
   none: 'Aucune action nocturne',
   inspect: 'Découvrir le rôle d’un joueur',
   protect: 'Protéger un joueur des attaques nocturnes',
   kill: 'Éliminer un joueur',
-  mark: 'Marquer un joueur (simple note pour le MJ)',
+  mark: 'Marquer un joueur (marque permanente, comme le charme du Joueur de flûte)',
 };
 
 export const CUSTOM_SCHEDULE_LABELS: Record<CustomSchedule, string> = {
@@ -74,6 +90,16 @@ export function validateCustomRole(input: unknown): { ok: true; role: CustomRole
     issues.push({ field: 'uses', message: 'Utilisations : illimité ou entier entre 1 et 20.' });
   }
   if (typeof o.canTargetSelf !== 'boolean') issues.push({ field: 'canTargetSelf', message: 'Valeur booléenne attendue.' });
+  const winRaw = o.winCondition;
+  const winCondition = winRaw === undefined ? undefined : (winRaw as CustomWinCondition);
+  if (winCondition !== undefined && !CUSTOM_WIN_CONDITIONS.includes(winCondition)) {
+    issues.push({ field: 'winCondition', message: 'Condition de victoire invalide.' });
+  } else if (team && TEAMS.includes(team)) {
+    const effective = effectiveWinCondition({ team, winCondition });
+    if (team === 'solo' && effective === 'camp') issues.push({ field: 'winCondition', message: 'Un solitaire n’a pas de camp : choisissez une condition de victoire propre.' });
+    if (team !== 'solo' && effective !== 'camp') issues.push({ field: 'winCondition', message: 'Un rôle du village ou des loups gagne avec son camp ; choisissez « Solitaire » pour une condition propre.' });
+    if (effective === 'all-marked' && nightAction !== 'mark') issues.push({ field: 'winCondition', message: 'Cette condition nécessite l’action nocturne « Marquer un joueur ».' });
+  }
   const wakeOrder = o.wakeOrder;
   if (!(typeof wakeOrder === 'number' && Number.isInteger(wakeOrder) && wakeOrder >= 0 && wakeOrder <= 100)) {
     issues.push({ field: 'wakeOrder', message: 'Ordre de réveil : entier entre 0 et 100.' });
@@ -92,6 +118,7 @@ export function validateCustomRole(input: unknown): { ok: true; role: CustomRole
       canTargetSelf: o.canTargetSelf as boolean,
       onDeath: onDeath as CustomOnDeath,
       wakeOrder: wakeOrder as number,
+      ...(winCondition ? { winCondition } : {}),
     },
   };
 }

@@ -30,6 +30,54 @@ export interface AutoCompositionOptions {
   include?: RoleId[];
   exclude?: RoleId[];
   allowSolo?: boolean;
+  /** Ajustements de poids appris de l'historique (voir learnBalance). */
+  adjustments?: BalanceAdjustments;
+}
+
+export type BalanceAdjustments = Partial<Record<RoleId, number>>;
+
+/** Résultat simplifié d'une partie terminée, pour l'apprentissage des poids. */
+export interface GameOutcomeSample {
+  roles: RoleId[];
+  /** true : victoire du village ; false : victoire d'un autre camp (loups, solitaire…). */
+  villageWon: boolean;
+}
+
+export interface LearnedBalance {
+  adjustments: BalanceAdjustments;
+  sampleSize: number;
+  /** Détail par rôle, pour l'explication affichée au MJ. */
+  details: { roleId: RoleId; games: number; villageRate: number; delta: number }[];
+}
+
+/**
+ * Ajuste les poids d'équilibrage à partir des parties réellement jouées :
+ * pour chaque rôle, compare le taux de victoire du village quand le rôle est
+ * présent au taux global. L'écart est amorti (peu de parties = petit effet)
+ * et borné à ±3 points. Purement statistique et local : aucune donnée ne sort
+ * de l'appareil.
+ */
+export function learnBalance(samples: readonly GameOutcomeSample[], minGames = 3): LearnedBalance {
+  const total = samples.length;
+  const adjustments: BalanceAdjustments = {};
+  const details: LearnedBalance['details'] = [];
+  if (total < minGames) return { adjustments, sampleSize: total, details };
+  const overall = samples.filter((s) => s.villageWon).length / total;
+  const roleIds = new Set<RoleId>();
+  for (const s of samples) for (const r of s.roles) roleIds.add(r);
+  for (const roleId of roleIds) {
+    if (roleId === 'villageois') continue;
+    const withRole = samples.filter((s) => s.roles.includes(roleId));
+    if (withRole.length < minGames) continue;
+    const rate = withRole.filter((s) => s.villageWon).length / withRole.length;
+    const shrink = withRole.length / (withRole.length + 5);
+    const raw = (rate - overall) * 10 * shrink;
+    const delta = Math.round(Math.max(-3, Math.min(3, raw)) * 10) / 10;
+    if (delta !== 0) adjustments[roleId] = delta;
+    details.push({ roleId, games: withRole.length, villageRate: rate, delta });
+  }
+  details.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+  return { adjustments, sampleSize: total, details };
 }
 
 export interface AutoComposition {
@@ -59,7 +107,7 @@ const TIERS: Record<Complexity, BuiltinRoleId[][]> = {
     ['sorciere', 'chasseur'],
     ['cupidon', 'salvateur', 'petite-fille', 'ancien'],
     ['idiot', 'renard', 'corbeau', 'montreur-ours', 'bouc-emissaire', 'chevalier', 'juge-begue', 'servante'],
-    ['deux-soeurs', 'trois-freres', 'enfant-sauvage', 'chien-loup', 'villageois-villageois'],
+    ['deux-soeurs', 'trois-freres', 'enfant-sauvage', 'chien-loup', 'villageois-villageois', 'gitane'],
   ],
 };
 
@@ -72,17 +120,21 @@ function specialQuota(n: number, c: Complexity): number {
   return Math.max(3, Math.round(n * 0.55));
 }
 
-function weight(id: RoleId): number {
-  return BUILTIN_ROLES.get(id as BuiltinRoleId)?.balance ?? 0;
+function weight(id: RoleId, adj?: BalanceAdjustments): number {
+  return (BUILTIN_ROLES.get(id as BuiltinRoleId)?.balance ?? 0) + (adj?.[id] ?? 0);
 }
 
 function copiesOf(id: RoleId): number {
   return BUILTIN_ROLES.get(id as BuiltinRoleId)?.exactCopies ?? 1;
 }
 
-export function balanceOf(roles: readonly RoleId[]): number {
-  return roles.reduce((s, r) => s + weight(r), 0);
+export function balanceOf(roles: readonly RoleId[], adj?: BalanceAdjustments): number {
+  const total = roles.reduce((s, r) => s + weight(r, adj), 0);
+  return Math.round(total * 10) / 10;
 }
+
+const weightOf = weight;
+const balanceOfWith = balanceOf;
 
 export function generateComposition(opts: AutoCompositionOptions): AutoComposition {
   const n = Math.max(MIN_PLAYERS, Math.min(MAX_PLAYERS, Math.floor(opts.playerCount)));
@@ -94,6 +146,10 @@ export function generateComposition(opts: AutoCompositionOptions): AutoCompositi
     return Boolean(def && opts.expansions.includes(def.expansion) && !exclude.has(id));
   };
   const tolerance = Math.max(3, Math.round(n / 3));
+  const adj = opts.adjustments;
+  const learned = Object.keys(adj ?? {}).length;
+  const weight = (id: RoleId) => weightOf(id, adj);
+  const balanceOf = (rs: readonly RoleId[]) => balanceOfWith(rs, adj);
   const roles: RoleId[] = [];
   const has = (id: RoleId) => roles.includes(id);
 
@@ -195,6 +251,7 @@ export function generateComposition(opts: AutoCompositionOptions): AutoCompositi
   }
 
   const balance = balanceOf(roles);
+  if (learned > 0) explanations.push(`Poids ajustés d’après vos parties terminées (${learned} rôle(s) concerné(s)).`);
   explanations.push(`Équilibre final : ${balance > 0 ? '+' : ''}${balance} (plage acceptée ±${tolerance} ; positif = avantage village).`);
   return { roles, extraCards, balance, explanations };
 }

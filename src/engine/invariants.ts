@@ -19,11 +19,22 @@ export function checkInvariants(state: GameState): string[] {
       if (k === 'custom' && v < -1) errors.push(`${p.name} : compteur personnalisé invalide.`);
     }
   }
-  const deaths = state.log.filter((e) => e.event.type === 'death');
-  const deathIds = deaths.map((e) => (e.event.type === 'death' ? e.event.playerId : ''));
-  if (new Set(deathIds).size !== deathIds.length) errors.push('Un joueur est mort plusieurs fois.');
+  // Morts et retours en jeu doivent alterner pour chaque joueur.
+  const deadNow = new Set<string>();
+  for (const e of state.log) {
+    if (e.event.type === 'death') {
+      if (deadNow.has(e.event.playerId)) errors.push('Un joueur est mort deux fois sans revenir en jeu.');
+      deadNow.add(e.event.playerId);
+    } else if (e.event.type === 'revived') {
+      if (!deadNow.has(e.event.playerId)) errors.push('Retour en jeu d’un joueur vivant.');
+      deadNow.delete(e.event.playerId);
+    }
+  }
   const dead = state.players.filter((p) => !p.alive).length;
-  if (dead !== deathIds.length) errors.push(`Morts enregistrées (${deathIds.length}) ≠ joueurs morts (${dead}).`);
+  if (dead !== deadNow.size) errors.push(`Morts enregistrées (${deadNow.size}) ≠ joueurs morts (${dead}).`);
+  if (state.mayorAbolished && state.mayorId) errors.push('Un maire existe alors que le poste est aboli.');
+  const drawnIds = state.events.map((e) => e.cardId);
+  if (new Set(drawnIds).size !== drawnIds.length) errors.push('Une carte Événement a été tirée deux fois.');
 
   if (state.lovers) {
     const [a, b] = state.lovers;

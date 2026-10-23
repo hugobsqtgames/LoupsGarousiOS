@@ -23,6 +23,12 @@ export const DEFAULT_VARIANTS: Variants = {
   servantEnabled: true,
   idiotDiesSecondTime: true,
   ravenBonus: 2,
+  bigBadWolfRule: 'wolf_died',
+  whiteWolfNights: 'even',
+  siblingsWakeLater: false,
+  elderTakesIdiot: false,
+  newMoonEvents: false,
+  eventFrequency: 1,
 };
 
 export interface VariantOption<K extends keyof Variants> {
@@ -80,7 +86,7 @@ export const VARIANT_OPTIONS: AnyVariantOption[] = [
       { value: 'none', label: 'Personne n’est éliminé' },
     ],
   },
-  { key: 'scapegoatOnTie', label: 'Bouc émissaire prioritaire', help: 'En cas d’égalité, le Bouc émissaire vivant est éliminé avant tout départage.', official: false },
+  { key: 'scapegoatOnTie', label: 'Bouc émissaire prioritaire', help: 'Règle officielle : en cas d’égalité, le Bouc émissaire est éliminé à la place des ex æquo. Sa priorité sur le maire n’est pas précisée.', official: true },
   {
     key: 'voteMode',
     label: 'Saisie des votes par défaut',
@@ -94,52 +100,86 @@ export const VARIANT_OPTIONS: AnyVariantOption[] = [
   { key: 'allowBlankVotes', label: 'Votes blancs', help: 'Autorise l’enregistrement de votes blancs.', official: false },
   { key: 'strictVoterCount', label: 'Limiter au nombre de votants', help: 'Empêche d’enregistrer plus de voix que de votants.', official: false },
   { key: 'callInactiveRoles', label: 'Appeler les rôles absents', help: 'Le MJ appelle aussi les rôles morts ou hors jeu pour ne rien révéler.', official: false },
-  { key: 'salvateurSelf', label: 'Le Salvateur peut se protéger', help: 'Interprétation la plus répandue.', official: false },
-  { key: 'salvateurNoRepeat', label: 'Salvateur : pas deux fois la même cible', help: 'Interdit de protéger la même personne deux nuits de suite.', official: false },
-  { key: 'witchSelfHeal', label: 'La Sorcière peut se sauver', help: 'Autorise la potion de vie sur elle-même.', official: false },
+  { key: 'salvateurSelf', label: 'Le Salvateur peut se protéger', help: 'Règle officielle (livret Nouvelle Lune).', official: true },
+  { key: 'salvateurNoRepeat', label: 'Salvateur : pas deux fois la même cible', help: 'Règle officielle : jamais la même personne deux nuits de suite.', official: true },
+  { key: 'witchSelfHeal', label: 'La Sorcière peut se sauver', help: 'Règle officielle : elle peut se guérir si elle vient d’être attaquée.', official: true },
   {
     key: 'elderVengeance',
     label: 'Vengeance de l’Ancien',
-    help: 'Qui déclenche la perte des pouvoirs du village quand l’Ancien meurt ?',
-    official: false,
+    help: 'Règle officielle : le vote, la potion de mort ou le tir du Chasseur privent les villageois de leurs pouvoirs.',
+    official: true,
     choices: [
-      { value: 'village', label: 'Vote, Chasseur ou Sorcière' },
+      { value: 'village', label: 'Vote, Chasseur ou Sorcière (officiel)' },
       { value: 'vote_only', label: 'Vote uniquement' },
     ],
   },
   {
     key: 'angelWindow',
     label: 'Fenêtre de victoire de l’Ange',
-    help: 'Période pendant laquelle la mort de l’Ange le fait gagner.',
-    official: false,
+    help: 'Règle officielle : éliminé au premier tour (vote du premier jour, loups ou potion de la première nuit).',
+    official: true,
     choices: [
-      { value: 'first_round', label: 'Premier vote ou première nuit' },
+      { value: 'first_round', label: 'Premier vote ou première nuit (officiel)' },
       { value: 'first_vote', label: 'Premier vote uniquement' },
     ],
   },
-  { key: 'angelStartsWithDay', label: 'Avec l’Ange, commencer par le jour', help: 'La partie débute par un débat et un vote.', official: false },
+  { key: 'angelStartsWithDay', label: 'Avec l’Ange, commencer par le jour', help: 'Règle officielle : la partie débute par un débat et un vote.', official: true },
   {
     key: 'wildChildTrigger',
     label: 'Transformation de l’Enfant sauvage',
-    help: 'Quand la mort du modèle transforme-t-elle l’Enfant ?',
-    official: false,
+    help: 'Règle officielle : toute élimination du modèle le transforme.',
+    official: true,
     choices: [
-      { value: 'any_death', label: 'Toute mort du modèle' },
+      { value: 'any_death', label: 'Toute mort du modèle (officiel)' },
       { value: 'wolves_only', label: 'Mort par les loups uniquement' },
     ],
   },
   { key: 'cupidWinsWithMixedLovers', label: 'Cupidon gagne avec un couple mixte', help: 'Variante : Cupidon partage la victoire des Amoureux.', official: false },
-  { key: 'servantEnabled', label: 'Proposer la Servante dévouée', help: 'Après chaque élimination par vote, proposer l’intervention de la Servante.', official: false },
+  { key: 'servantEnabled', label: 'Proposer la Servante dévouée', help: 'Après chaque élimination par vote, proposer l’intervention de la Servante (règle officielle).', official: true },
   { key: 'idiotDiesSecondTime', label: 'Idiot révélé : mort au second vote', help: 'Un Idiot déjà révélé et de nouveau désigné est éliminé.', official: false },
   {
     key: 'ravenBonus',
     label: 'Voix ajoutées par le Corbeau',
-    help: 'Nombre de voix ajoutées contre la cible du Corbeau.',
-    official: false,
+    help: 'Règle officielle (Le Village) : 2 voix.',
+    official: true,
     choices: [
       { value: 1, label: '1 voix' },
-      { value: 2, label: '2 voix' },
+      { value: 2, label: '2 voix (officiel)' },
       { value: 3, label: '3 voix' },
+    ],
+  },
+  {
+    key: 'bigBadWolfRule',
+    label: 'Grand Méchant Loup : fin de la seconde victime',
+    help: 'Les livrets divergent : « Best Of » (aucun autre loup éliminé) ou « Personnages » (aucun loup, Enfant sauvage ni Chien-loup éliminé).',
+    official: true,
+    choices: [
+      { value: 'wolf_died', label: 'Un loup éliminé (Best Of)' },
+      { value: 'wolf_or_ambiguous_died', label: 'Loup, Enfant sauvage ou Chien-loup éliminé (Personnages)' },
+    ],
+  },
+  {
+    key: 'whiteWolfNights',
+    label: 'Nuits du Loup-Garou blanc',
+    help: 'Le livret dit « une nuit sur deux » sans préciser lesquelles.',
+    official: false,
+    choices: [
+      { value: 'even', label: 'Nuits paires (2, 4, 6…)' },
+      { value: 'odd', label: 'Nuits impaires (1, 3, 5…)' },
+    ],
+  },
+  { key: 'siblingsWakeLater', label: 'Sœurs et Frères : réveils suivants', help: 'Pour joueurs expérimentés : ils se réveillent aussi une nuit sur deux pour se concerter (règle officielle facultative).', official: true },
+  { key: 'elderTakesIdiot', label: 'Ancien : variante pour les courageux', help: 'Si l’Ancien est tué par le village, un Idiot déjà révélé est éliminé avec lui (variante du livret Nouvelle Lune).', official: true },
+  { key: 'newMoonEvents', label: 'Cartes Événement (Nouvelle Lune)', help: 'Chaque matin sauf le premier, un événement est tiré (cartes de l’extension Nouvelle Lune).', official: true },
+  {
+    key: 'eventFrequency',
+    label: 'Fréquence des événements',
+    help: 'Le livret conseille un tirage un matin sur deux ou trois pour les premières parties.',
+    official: true,
+    choices: [
+      { value: 1, label: 'Chaque matin' },
+      { value: 2, label: 'Un matin sur deux' },
+      { value: 3, label: 'Un matin sur trois' },
     ],
   },
 ];
@@ -157,6 +197,9 @@ export function checkVariants(v: Variants): VariantIssue[] {
   }
   if (!v.mayorEnabled && v.mayorVoteWeight === 2) {
     issues.push({ level: 'warning', message: 'Le poids du vote du maire est sans effet sans élection du maire.' });
+  }
+  if (!v.newMoonEvents && v.eventFrequency !== 1) {
+    issues.push({ level: 'warning', message: 'La fréquence des événements est sans effet sans la variante Nouvelle Lune.' });
   }
   if (!Number.isInteger(v.ravenBonus) || v.ravenBonus < 0 || v.ravenBonus > 5) {
     issues.push({ level: 'error', message: 'Le bonus du Corbeau doit être un entier entre 0 et 5.' });

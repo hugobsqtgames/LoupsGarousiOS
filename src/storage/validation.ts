@@ -30,6 +30,13 @@ const ACTION_TYPES = new Set<GameAction['type']>([
   'decision/resolve',
   'mj/eliminate',
   'mj/note',
+  'mj/revive',
+  'mj/set-team',
+  'mj/grant-use',
+  'mj/extra-vote',
+  'mj/remove-mayor',
+  'event/draw',
+  'ballot/set-count',
   'game/finish',
   'game/abandon',
 ]);
@@ -95,6 +102,7 @@ export function parseSetup(input: unknown): GameSetup {
     // Les variantes absentes (ancien format) reçoivent leur valeur par défaut.
     variants: normalizeVariants(input.variants),
     customRoles,
+    ...(input.dealMode === 'phone' ? { dealMode: 'phone' as const } : {}),
     sectGroups,
   };
 }

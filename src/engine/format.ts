@@ -1,3 +1,4 @@
+import { getEventCard } from './events';
 import { phaseLabel, roleName } from './selectors';
 import type { BallotOutcome, DeathCause, GameAction, GameEvent, GameState, LogEntry, PlayerId, StepKind, Winner } from './types';
 
@@ -14,6 +15,7 @@ export const DEATH_CAUSE_LABELS: Record<DeathCause, string> = {
   scapegoat: 'sacrifié(e) comme Bouc émissaire',
   'rusty-sword': 'mort(e) du tétanos (épée rouillée)',
   'custom-kill': 'éliminé(e) par un pouvoir nocturne',
+  event: 'foudroyé(e) (carte Événement)',
   mj: 'éliminé(e) par le MJ',
 };
 
@@ -25,6 +27,7 @@ export const WINNER_LABELS: Record<Winner, string> = {
   'white-wolf': 'Le Loup-Garou blanc',
   angel: 'L’Ange',
   sectarian: 'L’Abominable sectaire',
+  custom: 'Un rôle personnalisé',
   none: 'Personne',
   abandoned: 'Partie interrompue',
 };
@@ -49,6 +52,9 @@ export const STEP_TITLES: Record<StepKind, string> = {
   piper: 'Le Joueur de flûte',
   charmed: 'Les joueurs charmés',
   raven: 'Le Corbeau',
+  judge: 'Le Juge bègue',
+  'bear-tamer': 'Le Montreur d’ours',
+  gypsy: 'La Gitane',
   custom: 'Rôle personnalisé',
   bluff: 'Appel pour la forme',
 };
@@ -157,9 +163,32 @@ export function describeEvent(state: GameState, e: GameEvent, hideSecrets = fals
       return `Décision enregistrée${e.payload.target ? ` : ${n(e.payload.target)}` : ''}.`;
     case 'victory':
       return `Victoire : ${WINNER_LABELS[e.victory.winner]}. ${e.victory.reason}`;
+    case 'revived':
+      return `${n(e.playerId)} revient en jeu${hideSecrets ? '' : ` (${r(e.roleId)})`}.`;
+    case 'team-changed':
+      return `${n(e.playerId)} rejoint le camp ${e.team === 'wolves' ? 'des loups' : 'du village'}.`;
+    case 'use-granted':
+      return `${n(e.playerId)} récupère ${e.key === 'heal' ? 'sa potion de vie' : e.key === 'poison' ? 'sa potion de mort' : 'son tir'}.`;
+    case 'extra-vote':
+      return 'Le MJ accorde un vote d’élimination supplémentaire.';
+    case 'mayor-abolished':
+      return `${n(e.playerId)} était maire : le poste de maire est perdu définitivement.`;
+    case 'event-drawn':
+      return `Carte Événement : ${eventName(e.cardId)}${e.readerId ? ` (lue par ${n(e.readerId)})` : ''}.`;
+    case 'spiritualism':
+      if (!e.answererId) return 'Spiritisme : aucun joueur n’a encore été éliminé, la question reste sans réponse.';
+      return e.source === 'gypsy'
+        ? `Spiritisme (Gitane) : ${e.askerId ? n(e.askerId) : 'le Spirite désigné'} pose la question ${e.question} de la carte n° ${e.card} ; ${n(e.answererId)} répond par oui ou non.`
+        : `Spiritisme : ${e.askerId ? n(e.askerId) : 'le Spirite'} pose une question ; ${n(e.answererId)} répond par oui ou non.`;
+    case 'marked':
+      return `${n(e.byId)} marque ${n(e.targetId)}.`;
     case 'note':
       return e.text;
   }
+}
+
+function eventName(id: string): string {
+  return getEventCard(id)?.name ?? id;
 }
 
 export function describeEntry(state: GameState, entry: LogEntry, hideSecrets = false): string {
@@ -182,8 +211,9 @@ export function describeAction(state: Pick<GameState, 'players' | 'setup'>, a: G
       if (p.poison) parts.push(`empoisonne ${n(p.poison)}`);
       if (p.infect !== undefined) parts.push(p.infect ? 'infecte' : 'n’infecte pas');
       if (p.team) parts.push(p.team === 'wolves' ? 'camp des loups' : 'camp du village');
-      if (p.cardIndex !== undefined) parts.push(p.cardIndex === null ? 'aucune carte' : `carte ${p.cardIndex + 1}`);
+      if (p.cardIndex !== undefined) parts.push(p.cardIndex === null ? 'aucune carte' : kind === 'gypsy' ? `carte Spiritisme ${p.cardIndex}` : `carte ${p.cardIndex + 1}`);
       if (p.littleGirlCaught) parts.push('Petite Fille surprise');
+      if (p.question !== undefined) parts.push(`question ${p.question}`);
       return `${title} : ${parts.join(', ') || 'fait'}`;
     }
     case 'night/resolve':
@@ -205,7 +235,21 @@ export function describeAction(state: Pick<GameState, 'players' | 'setup'>, a: G
     case 'ballot/reopen':
       return 'Réouverture du scrutin';
     case 'ballot/confirm':
-      return 'Validation du scrutin';
+      return a.spared ? 'Validation du scrutin : condamné gracié' : 'Validation du scrutin';
+    case 'ballot/set-count':
+      return `Mains levées : ${a.count} voix pour ${a.target === 'blank' ? 'blanc' : a.target === 'abstain' ? 'abstention' : n(a.target)}`;
+    case 'mj/revive':
+      return `Retour en jeu de ${n(a.playerId)}${a.asVillager ? ' (Simple Villageois)' : ''}`;
+    case 'mj/set-team':
+      return `${n(a.playerId)} passe dans le camp ${a.team === 'wolves' ? 'des loups' : 'du village'}`;
+    case 'mj/grant-use':
+      return `${n(a.playerId)} récupère un pouvoir (${a.key === 'heal' ? 'potion de vie' : a.key === 'poison' ? 'potion de mort' : 'tir'})`;
+    case 'mj/extra-vote':
+      return 'Vote supplémentaire accordé';
+    case 'mj/remove-mayor':
+      return 'Maire destitué';
+    case 'event/draw':
+      return `Carte Événement : ${eventName(a.cardId)}`;
     case 'ballot/cancel':
       return 'Annulation du scrutin';
     case 'judge/second-vote':

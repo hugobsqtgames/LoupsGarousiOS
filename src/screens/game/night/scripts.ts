@@ -21,6 +21,9 @@ const WAKE: Record<Exclude<StepKind, 'custom' | 'bluff'>, string> = {
   piper: 'Joueur de flûte, réveille-toi. Désigne les deux joueurs que tu veux charmer.',
   charmed: 'Je vais toucher les joueurs charmés. Charmés, réveillez-vous, reconnaissez-vous, puis rendormez-vous.',
   raven: 'Corbeau, réveille-toi. Désigne le joueur que tu soupçonnes.',
+  judge: 'Juge bègue, réveille-toi. Montre-moi le signe que tu feras pour demander un second vote.',
+  'bear-tamer': 'Montreur d’ours, réveille-toi, que je sache qui tu es. Rendors-toi.',
+  gypsy: 'Gitane, réveille-toi. Veux-tu utiliser ton pouvoir cette nuit ?',
 };
 
 const SLEEP: Partial<Record<StepKind, string>> = {
@@ -40,6 +43,8 @@ const SLEEP: Partial<Record<StepKind, string>> = {
   witch: 'Sorcière, rendors-toi.',
   piper: 'Joueur de flûte, rendors-toi.',
   raven: 'Corbeau, rendors-toi.',
+  judge: 'Juge bègue, rendors-toi.',
+  gypsy: 'Gitane, rendors-toi.',
 };
 
 export function wakeScript(step: NightStep, registry: RoleRegistry): string {

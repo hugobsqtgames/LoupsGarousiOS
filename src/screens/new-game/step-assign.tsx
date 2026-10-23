@@ -9,7 +9,8 @@ import { OptionGrid } from '@/components/player-picker';
 import { Sheet } from '@/components/sheet';
 import { AppText } from '@/components/text';
 import { useRoleRegistry } from '@/hooks/use-roles';
-import { randomAssignments, remainingCards, rolesFromCounts } from '@/state/draft';
+import { draftDeal, needsGroups, remainingCards, rolesFromCounts } from '@/state/draft';
+import { useAppStore } from '@/state/app-store';
 import { useDraftStore } from '@/state/draft-store';
 import { useTheme } from '@/theme/theme-context';
 import { spacing } from '@/theme/themes';
@@ -22,9 +23,13 @@ export function StepAssign() {
   const [picking, setPicking] = useState<string | null>(null);
   const [reveal, setReveal] = useState(false);
   const roles = rolesFromCounts(draft.roleCounts);
-  const preview = draft.assignMode === 'random' ? randomAssignments(draft.players, roles, draft.seed) : draft.assignments;
+  const customRoles = useAppStore((s) => s.customRoles);
+  const deal = draftDeal(draft);
+  const preview = deal.assignments;
   const left = remainingCards(draft);
-  const hasSect = roles.includes('sectaire');
+  const hasSect = needsGroups(roles, customRoles);
+  const thiefDealt = Object.values(preview).includes('voleur');
+  const drawn = draft.assignMode !== 'manual';
 
   const pickOptions = (playerId: string) => {
     const current = draft.assignments[playerId];
@@ -38,12 +43,13 @@ export function StepAssign() {
 
   return (
     <View style={styles.gap}>
-      <Segmented<'random' | 'manual'>
+      <Segmented<'random' | 'phone' | 'manual'>
         value={draft.assignMode}
         onChange={(assignMode) => update({ assignMode })}
         options={[
-          { value: 'random', label: 'Tirage par l’app' },
-          { value: 'manual', label: 'Saisie des cartes reçues' },
+          { value: 'random', label: 'Tirage' },
+          { value: 'phone', label: 'Sur le téléphone' },
+          { value: 'manual', label: 'Cartes reçues' },
         ]}
         testID="assign-mode"
       />
@@ -51,13 +57,33 @@ export function StepAssign() {
         <AppText variant="small" tone="muted">
           {draft.assignMode === 'random'
             ? 'L’application tire les rôles au sort. Distribuez ensuite les cartes physiques selon cette liste, sans la montrer aux joueurs.'
-            : 'Mélangez et distribuez les cartes physiques, puis indiquez la carte reçue par chaque joueur.'}
+            : draft.assignMode === 'phone'
+              ? 'Sans cartes : après le lancement, le téléphone passe de main en main et chaque joueur découvre son rôle en secret, puis le cache.'
+              : 'Mélangez et distribuez les cartes physiques, puis indiquez la carte reçue par chaque joueur.'}
         </AppText>
+        {roles.includes('voleur') && drawn ? (
+          <AppText variant="small" tone="muted">
+            Voleur (règle officielle) : les deux cartes supplémentaires sont mélangées au paquet ; les deux cartes restantes après la distribution vont au centre.
+            {draft.assignMode === 'phone' ? ' Le Voleur les découvrira sur le téléphone pendant la première nuit.' : ''}
+          </AppText>
+        ) : null}
         <View style={styles.row}>
           <Button label={reveal ? 'Masquer les rôles' : 'Afficher les rôles'} icon={reveal ? 'eye-off' : 'eye'} variant="secondary" size="sm" onPress={() => setReveal((v) => !v)} testID="toggle-reveal-assign" />
-          {draft.assignMode === 'random' ? <Button label="Nouveau tirage" icon="dice" variant="quiet" size="sm" onPress={() => update((d) => ({ ...d, seed: (d.seed * 48271 + 11) % 2147483647 }))} testID="reroll" /> : null}
+          {drawn ? <Button label="Nouveau tirage" icon="dice" variant="quiet" size="sm" onPress={() => update((d) => ({ ...d, seed: (d.seed * 48271 + 11) % 2147483647 }))} testID="reroll" /> : null}
         </View>
       </Panel>
+      {drawn && roles.includes('voleur') ? (
+        <Panel testID="center-cards">
+          <AppText variant="bodyStrong">Cartes au centre</AppText>
+          <AppText variant="small" tone="muted">
+            {thiefDealt
+              ? reveal
+                ? deal.centerCards.map((c) => registry.get(c).name).join(' · ')
+                : 'Deux cartes masquées.'
+              : 'Le Voleur n’a pas été distribué : il n’y a pas de cartes au centre.'}
+          </AppText>
+        </Panel>
+      ) : null}
 
       <Panel padded={false}>
         {draft.players.map((p, i) => {

@@ -6,6 +6,7 @@ import { replay } from './replay';
 import { Timeline } from './timeline';
 import { createRng, pick, shuffle } from './rng';
 import { activeBallot } from './selectors';
+import { eventDeck } from './events';
 import { DEFAULT_VARIANTS } from './variants';
 import type { GameAction, GameRecord, GameSetup, GameState, PlayerId, StepPayload, Variants } from './types';
 
@@ -23,6 +24,10 @@ export interface FuzzReport {
   finished: boolean;
   winner: string | null;
   violations: string[];
+  /** Nombre d'actions appliquées par type (couverture). */
+  appliedTypes: Record<string, number>;
+  /** Types d'étapes de nuit renseignées. */
+  stepKinds: Record<string, number>;
 }
 
 function randomSetup(seed: number): GameSetup {
@@ -30,7 +35,7 @@ function randomSetup(seed: number): GameSetup {
   const n = 5 + Math.floor(rng() * 20);
   const complexity = pick<Complexity>(['decouverte', 'equilibre', 'riche'], rng);
   const include = rng() < 0.3 ? ['voleur' as const] : rng() < 0.2 ? ['comedien' as const] : [];
-  const comp = generateComposition({ playerCount: n, expansions: ['base', 'nouvelle-lune', 'personnages'], complexity, seed, allowSolo: rng() < 0.5, include });
+  const comp = generateComposition({ playerCount: n, expansions: ['base', 'nouvelle-lune', 'le-village', 'personnages'], complexity, seed, allowSolo: rng() < 0.5, include });
   const roles = shuffle(comp.roles, rng);
   const players = roles.map((_, i) => ({ id: `p${i + 1}`, name: `J${i + 1}` }));
   const variants: Variants = {
@@ -54,6 +59,12 @@ function randomSetup(seed: number): GameSetup {
     cupidWinsWithMixedLovers: rng() < 0.3,
     servantEnabled: rng() < 0.8,
     idiotDiesSecondTime: rng() < 0.8,
+    bigBadWolfRule: rng() < 0.5 ? 'wolf_died' : 'wolf_or_ambiguous_died',
+    whiteWolfNights: rng() < 0.5 ? 'even' : 'odd',
+    siblingsWakeLater: rng() < 0.3,
+    elderTakesIdiot: rng() < 0.3,
+    newMoonEvents: rng() < 0.5,
+    eventFrequency: pick([1, 2, 3] as const, rng),
   };
   return {
     formatVersion: 1,
@@ -93,6 +104,8 @@ function randomPayload(state: GameState, kind: string, rng: () => number): StepP
       return { infect: rng() < 0.3 };
     case 'wolves':
       return { target: t(), littleGirlCaught: rng() < 0.05 };
+    case 'gypsy':
+      return rng() < 0.3 ? { target: null } : { target: t(), cardIndex: Math.floor(rng() * 6), question: 1 + Math.floor(rng() * 4) };
     default:
       return { target: t() };
   }
@@ -118,26 +131,37 @@ function candidateAction(state: GameState, rng: () => number): GameAction {
       return { type: 'night/submit', stepKey: rng() < 0.02 ? 'bogus' : step.key, payload: randomPayload(state, step.kind, rng) };
     }
     case 'dawn':
-      return r < 0.05 ? { type: 'mj/eliminate', playerId: randomPlayer(state, rng) ?? 'p1' } : { type: 'dawn/confirm' };
+      if (r < 0.03) return { type: 'mj/revive', playerId: randomPlayer(state, rng, 0.2) ?? 'p1', asVillager: rng() < 0.5 };
+      return r < 0.06 ? { type: 'mj/eliminate', playerId: randomPlayer(state, rng) ?? 'p1' } : { type: 'dawn/confirm' };
     case 'day': {
       const b = activeBallot(state);
       if (!b || b.status === 'confirmed' || b.status === 'cancelled') {
         if (r < 0.15) return { type: 'day/end' };
         if (r < 0.2) return { type: 'judge/second-vote' };
         if (r < 0.23) return { type: 'mj/eliminate', playerId: randomPlayer(state, rng) ?? 'p1' };
+        if (r < 0.3) {
+          const deck = eventDeck(state);
+          if (deck.length && rng() < 0.8) return { type: 'event/draw', cardId: pick(deck, rng).id };
+        }
+        if (r < 0.32) return { type: 'mj/extra-vote' };
+        if (r < 0.33) return { type: 'mj/remove-mayor' };
+        if (r < 0.34) return { type: 'mj/set-team', playerId: randomPlayer(state, rng) ?? 'p1', team: rng() < 0.5 ? 'wolves' : 'village' };
+        if (r < 0.35) return { type: 'mj/grant-use', playerId: randomPlayer(state, rng) ?? 'p1', key: pick(['heal', 'poison', 'shot'] as const, rng) };
+        if (r < 0.36) return { type: 'mj/revive', playerId: randomPlayer(state, rng, 0.2) ?? 'p1', asVillager: rng() < 0.5 };
         const kind = !state.mayorId && state.setup.variants.mayorEnabled && rng() < 0.6 ? 'mayor' : 'elimination';
         return { type: 'ballot/open', kind, mode: rng() < 0.5 ? 'tally' : 'nominal', candidates: kind === 'mayor' && rng() < 0.5 ? shuffle(state.players.filter((p) => p.alive), rng).slice(0, 3).map((p) => p.id) : undefined };
       }
       if (b.status === 'closed') {
         if (r < 0.15) return { type: 'ballot/reopen' };
         if (r < 0.2) return { type: 'ballot/cancel' };
-        return { type: 'ballot/confirm' };
+        return { type: 'ballot/confirm', spared: rng() < 0.1 };
       }
       const count = countBallot(b);
       if (r < 0.1 || count.cast >= b.voters.length) return { type: 'ballot/close' };
       if (r < 0.12) return { type: 'ballot/cancel' };
       if (b.kind === 'mayor' && r < 0.17) return { type: 'ballot/candidate', playerId: randomPlayer(state, rng) ?? 'p1', add: rng() < 0.6 };
       const target = rng() < 0.05 ? 'blank' : rng() < 0.85 ? pick(b.candidates, rng) : (randomPlayer(state, rng, 0.5) ?? 'p1');
+      if (b.mode === 'tally' && r < 0.25) return { type: 'ballot/set-count', target, count: Math.floor(rng() * (b.voters.length + 2)) };
       const voterId = b.mode === 'nominal' ? (rng() < 0.95 ? pick(b.voters.length ? b.voters : ['p1'], rng) : (randomPlayer(state, rng, 0.5) ?? 'p1')) : rng() < 0.15 ? state.mayorId : null;
       return rng() < 0.2 ? { type: 'ballot/unvote', target, voterId } : { type: 'ballot/vote', target, voterId };
     }
@@ -152,7 +176,7 @@ export function fuzzGame(seed: number, maxActions = 600): FuzzReport {
   const timeline = Timeline.load({ setup, actions: [] }).timeline;
   let record: GameRecord = timeline.record;
   let state = timeline.state;
-  const report: FuzzReport = { seed, actionsTried: 0, actionsApplied: 0, rejected: 0, undos: 0, finished: false, winner: null, violations: [] };
+  const report: FuzzReport = { seed, actionsTried: 0, actionsApplied: 0, rejected: 0, undos: 0, finished: false, winner: null, violations: [], appliedTypes: {}, stepKinds: {} };
   const check = (label: string) => {
     for (const v of checkInvariants(state)) report.violations.push(`[${label}] ${v}`);
   };
@@ -179,6 +203,11 @@ export function fuzzGame(seed: number, maxActions = 600): FuzzReport {
     record = res.record;
     state = res.state;
     report.actionsApplied += 1;
+    report.appliedTypes[action.type] = (report.appliedTypes[action.type] ?? 0) + 1;
+    if (action.type === 'night/submit') {
+      const kind = action.stepKey.split(':')[0];
+      report.stepKinds[kind] = (report.stepKinds[kind] ?? 0) + 1;
+    }
     check(`#${i} ${action.type}`);
     if (report.violations.length > 0) break;
   }

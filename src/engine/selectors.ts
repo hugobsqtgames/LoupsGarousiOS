@@ -91,21 +91,35 @@ export function aliveNeighbors(state: Pick<GameState, 'players'>, id: PlayerId):
   return { left, right };
 }
 
-/** Premier loup vivant à gauche (sens horaire) d'un joueur. */
-export function firstWolfToLeft(state: Pick<GameState, 'players'>, id: PlayerId): PlayerState | null {
+/** Premier loup vivant à gauche (sens horaire) d'un joueur, éventuellement parmi un groupe donné. */
+export function firstWolfToLeft(state: Pick<GameState, 'players'>, id: PlayerId, among?: ReadonlySet<PlayerId>): PlayerState | null {
   const seats = [...state.players].sort((a, b) => a.seat - b.seat);
   const idx = seats.findIndex((p) => p.id === id);
   const n = seats.length;
   for (let k = 1; k < n; k++) {
     const p = seats[(idx + k) % n];
-    if (p.alive && isWolfSide(p)) return p;
+    if (p.alive && isWolfSide(p) && (!among || among.has(p.id))) return p;
   }
   return null;
 }
 
-/** Un joueur du camp des loups est-il déjà mort ? (condition du Grand Méchant Loup) */
+/** Un joueur du camp des loups est-il déjà mort ? */
 export function aWolfHasDied(state: Pick<GameState, 'players'>): boolean {
   return state.players.some((p) => !p.alive && isWolfSide(p));
+}
+
+/** Le Grand Méchant Loup a-t-il perdu sa seconde victime ? (selon la variante choisie) */
+export function bigBadWolfBlocked(state: Pick<GameState, 'players' | 'setup'>): boolean {
+  if (aWolfHasDied(state)) return true;
+  if (state.setup.variants.bigBadWolfRule === 'wolf_or_ambiguous_died') {
+    return state.players.some((p) => !p.alive && (p.roleId === 'enfant-sauvage' || p.roleId === 'chien-loup'));
+  }
+  return false;
+}
+
+/** Nuit de réveil solitaire du Loup-Garou blanc (« une nuit sur deux »). */
+export function whiteWolfNight(state: Pick<GameState, 'setup'>, n: number): boolean {
+  return state.setup.variants.whiteWolfNights === 'odd' ? n % 2 === 1 : n % 2 === 0;
 }
 
 export function isFirstRound(state: GameState): boolean {
