@@ -26,6 +26,7 @@
 | 19 | Loup-Garou blanc en variante « nuits impaires » : jamais appelé la nuit 1 | test de la variante | condition « attendre une nuit » réservée à la reprise par la Servante | `official-rules.test.ts` |
 | 20 | Libellé « Dramatique » coupé sur deux lignes dans le sélecteur de style | revue des captures | libellé « Drame » | captures |
 | 21 | Ciels du village virant au magenta dans les illustrations | revue des images | teinte resserrée | planche `docs/illustrations` |
+| 22 | Monkey test (outil de test) : clics bloqués 2 s sur les lignes masquées par une feuille ouverte, retour navigateur vers `about:blank`, saisie sans délai maximal pouvant bloquer indéfiniment | monkey tests (graines 11, 37, 101) | appui aux coordonnées comme un doigt, retour à l’app, délais sur les saisies — **aucune erreur de l’application** n’était en cause | `monkey.spec.ts` (3 graines + 1 000 gestes) |
 
 Incident de processus (non applicatif) : la copie initiale du modèle Expo avait remplacé le dossier `.git` du dépôt ; détecté avant tout envoi, la branche demandée a été recréée proprement.
 
