@@ -41,6 +41,59 @@ const ACTION_TYPES = new Set<GameAction['type']>([
   'game/abandon',
 ]);
 
+type FieldKind = 'string' | 'object' | 'boolean' | 'count';
+
+/** Champs obligatoires de chaque action : une action altérée est refusée à la lecture. */
+const REQUIRED_FIELDS: Partial<Record<GameAction['type'], [string, FieldKind][]>> = {
+  'night/submit': [
+    ['stepKey', 'string'],
+    ['payload', 'object'],
+  ],
+  'ballot/open': [['kind', 'string']],
+  'ballot/candidate': [
+    ['playerId', 'string'],
+    ['add', 'boolean'],
+  ],
+  'ballot/vote': [['target', 'string']],
+  'ballot/unvote': [['target', 'string']],
+  'decision/resolve': [
+    ['decisionId', 'string'],
+    ['payload', 'object'],
+  ],
+  'mj/eliminate': [['playerId', 'string']],
+  'mj/note': [['text', 'string']],
+  'mj/revive': [
+    ['playerId', 'string'],
+    ['asVillager', 'boolean'],
+  ],
+  'mj/set-team': [
+    ['playerId', 'string'],
+    ['team', 'string'],
+  ],
+  'mj/grant-use': [
+    ['playerId', 'string'],
+    ['key', 'string'],
+  ],
+  'event/draw': [['cardId', 'string']],
+  'ballot/set-count': [
+    ['target', 'string'],
+    ['count', 'count'],
+  ],
+};
+
+function fieldOk(v: unknown, kind: FieldKind): boolean {
+  switch (kind) {
+    case 'string':
+      return typeof v === 'string' && v.length <= 2000;
+    case 'object':
+      return isObj(v);
+    case 'boolean':
+      return typeof v === 'boolean';
+    case 'count':
+      return typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 1000;
+  }
+}
+
 function isObj(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
@@ -70,6 +123,7 @@ export function parseSetup(input: unknown): GameSetup {
     if (!isObj(p)) throw new DataError(`Joueur ${i + 1} invalide.`);
     return { id: str(p.id, 'player.id', 64), name: str(p.name, 'player.name', 64) };
   });
+  if (new Set(players.map((p) => p.id)).size !== players.length) throw new DataError('Identifiants de joueurs dupliqués.');
   if (!isObj(input.assignments)) throw new DataError('Attributions invalides.');
   const assignments: GameSetup['assignments'] = {};
   for (const p of players) {
@@ -113,6 +167,9 @@ export function parseActions(input: unknown): TimedAction[] {
   return input.map((a, i) => {
     if (!isObj(a) || !isObj(a.action) || typeof a.action.type !== 'string' || !ACTION_TYPES.has(a.action.type as GameAction['type'])) {
       throw new DataError(`Action ${i + 1} invalide.`);
+    }
+    for (const [field, kind] of REQUIRED_FIELDS[a.action.type as GameAction['type']] ?? []) {
+      if (!fieldOk(a.action[field], kind)) throw new DataError(`Action ${i + 1} invalide (${a.action.type} : ${field}).`);
     }
     return { action: a.action as unknown as GameAction, at: typeof a.at === 'string' ? a.at : '' };
   });

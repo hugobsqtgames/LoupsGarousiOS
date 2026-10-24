@@ -18,6 +18,6 @@ export * from './roles/custom';
 export { createRng, shuffle, hashString } from './rng';
 export { deepClone } from './clone';
 export { Timeline } from './timeline';
-export { fuzzGame, type FuzzReport } from './fuzz';
+export { fuzzGame, fuzzPlay, type FuzzReport } from './fuzz';
 export * from './events';
 export * from './narration';

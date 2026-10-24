@@ -58,3 +58,14 @@ describe('import', () => {
     expect(row?.format_version).toBe(a.record.setup.formatVersion);
   });
 });
+
+describe('validation de la configuration', () => {
+  it('refuse des identifiants de joueurs dupliqués (fichier importé forgé)', async () => {
+    const repo = await Repository.open(openNodeDriver());
+    const a = game('dup');
+    const forged = JSON.parse(JSON.stringify(a.record));
+    forged.setup.players[1].id = forged.setup.players[0].id;
+    await expect(repo.importData(JSON.stringify({ app: EXPORT_APP_ID, exportVersion: 1, games: [forged] }))).rejects.toThrow(/dupliqués/);
+    expect(await repo.listGames()).toEqual([]);
+  });
+});

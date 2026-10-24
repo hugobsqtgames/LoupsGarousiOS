@@ -30,7 +30,7 @@ export interface FuzzReport {
   stepKinds: Record<string, number>;
 }
 
-function randomSetup(seed: number): GameSetup {
+function randomSetup(seed: number, override: Partial<Variants> = {}): GameSetup {
   const rng = createRng(seed);
   const n = 5 + Math.floor(rng() * 20);
   const complexity = pick<Complexity>(['decouverte', 'equilibre', 'riche'], rng);
@@ -65,6 +65,7 @@ function randomSetup(seed: number): GameSetup {
     elderTakesIdiot: rng() < 0.3,
     newMoonEvents: rng() < 0.5,
     eventFrequency: pick([1, 2, 3] as const, rng),
+    ...override,
   };
   return {
     formatVersion: 1,
@@ -171,8 +172,13 @@ function candidateAction(state: GameState, rng: () => number): GameAction {
 }
 
 export function fuzzGame(seed: number, maxActions = 600): FuzzReport {
+  return fuzzPlay(seed, maxActions).report;
+}
+
+/** Comme `fuzzGame`, en renvoyant aussi l'enregistrement et l'état final (tests de persistance). */
+export function fuzzPlay(seed: number, maxActions = 600, override: Partial<Variants> = {}): { report: FuzzReport; record: GameRecord; state: GameState } {
   const rng = createRng(seed * 7919 + 13);
-  const setup = randomSetup(seed);
+  const setup = randomSetup(seed, override);
   const timeline = Timeline.load({ setup, actions: [] }).timeline;
   let record: GameRecord = timeline.record;
   let state = timeline.state;
@@ -217,5 +223,5 @@ export function fuzzGame(seed: number, maxActions = 600): FuzzReport {
   else if (JSON.stringify(rep.state) !== JSON.stringify(state)) report.violations.push('Le rejeu ne reproduit pas le même état (non-déterminisme).');
   report.finished = state.phase.kind === 'ended';
   report.winner = state.victory?.winner ?? null;
-  return report;
+  return { report, record, state };
 }
