@@ -47,3 +47,6 @@ coverage/
 test-results/
 playwright-report/
 e2e/.artifacts/
+
+# Session de simulateur EAS (contient un jeton)
+.env.eas-simulator

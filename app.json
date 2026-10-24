@@ -63,7 +63,10 @@
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO"
       ],
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "output": "single",
@@ -107,6 +110,20 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {
+        "headers": {
+          "Cross-Origin-Embedder-Policy": "credentialless",
+          "Cross-Origin-Opener-Policy": "same-origin"
+        },
+        "asyncRoutes": false,
+        "sitemap": false
+      },
+      "eas": {
+        "projectId": "80dc2e72-a90f-41d0-8ebd-fdf50eac8160"
+      }
+    },
+    "owner": "aazerty12"
   }
 }
