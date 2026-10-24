@@ -35,13 +35,17 @@ const checked: Record<string, number> = {};
 function audit(where: string): string[] {
   const problems: string[] = [];
   checked[where] = 0;
-  const visit = (node: JsonNode | string, hidden: boolean) => {
+  const visit = (node: JsonNode | string, hidden: boolean, insideControl: string | null) => {
     if (typeof node === 'string') return;
     const h = hidden || isHidden(node.props ?? {});
     const props = node.props ?? {};
     const role = (props.accessibilityRole ?? props.role) as string | undefined;
     const pressable = typeof props.onClick === 'function' || typeof props.onResponderRelease === 'function';
-    if (!h && (role ? INTERACTIVE.has(role) : pressable)) {
+    const interactive = !h && (role ? INTERACTIVE.has(role) : pressable);
+    // Un contrôle dans un autre contrôle : VoiceOver ne l'atteint pas (l'élément
+    // accessible englobant regroupe ses enfants) et le web l'interdit.
+    if (interactive && insideControl) problems.push(`${where} : contrôle imbriqué dans « ${insideControl} » (${(props.testID as string) ?? String(props.accessibilityLabel ?? '?')})`);
+    if (interactive) {
       checked[where] += 1;
       const label = String(props.accessibilityLabel ?? props['aria-label'] ?? '').trim();
       const name = label || textOf(node).replace(/\s+/g, ' ').trim();
@@ -49,10 +53,11 @@ function audit(where: string): string[] {
       if (pressable && !role) problems.push(`${where} : élément pressable sans rôle (${id})`);
       if (!name) problems.push(`${where} : ${role ?? 'élément'} sans nom (${id})`);
     }
-    for (const c of node.children ?? []) visit(c, h);
+    const here = interactive ? String(props.accessibilityLabel ?? props.testID ?? role ?? 'contrôle') : insideControl;
+    for (const c of node.children ?? []) visit(c, h, here);
   };
   const json = screen.toJSON() as JsonNode | JsonNode[] | null;
-  for (const n of Array.isArray(json) ? json : json ? [json] : []) visit(n, false);
+  for (const n of Array.isArray(json) ? json : json ? [json] : []) visit(n, false, null);
   return problems;
 }
 

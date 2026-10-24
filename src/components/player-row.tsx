@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { DEATH_CAUSE_LABELS, loverOf, type GameState, type PlayerState } from '@/engine';
 import { useRoleRegistry } from '@/hooks/use-roles';
@@ -29,11 +30,18 @@ export function PlayerRow({ state, player, hideSecrets, onPress, testID }: { sta
   const role = registry.has(player.roleId) ? registry.get(player.roleId) : null;
   const badges = playerBadges(state, player, hideSecrets);
   const tone = (c: string) => (c === 'accent' ? colors.accent : c === 'wolves' ? colors.wolves : c === 'solo' ? colors.solo : c === 'warning' ? colors.warning : colors.textMuted);
+  const [peek, setPeek] = useState(false);
+  const secret = hideSecrets && player.alive;
   return (
     <Pressable
       onPress={onPress}
+      // Appui long : le MJ jette un œil au rôle masqué ; relâcher le masque à nouveau.
+      onLongPress={secret ? () => setPeek(true) : undefined}
+      onPressOut={() => setPeek(false)}
+      delayLongPress={250}
       accessibilityRole="button"
       accessibilityLabel={`${player.name}${player.alive ? '' : ', éliminé'}${hideSecrets ? '' : `, ${role?.name ?? ''}`}`}
+      accessibilityHint={secret ? 'Rôle masqué : maintenir pour l’afficher' : undefined}
       style={({ pressed }) => [styles.row, { borderBottomColor: colors.border, opacity: player.alive ? 1 : 0.62 }, pressed && { backgroundColor: colors.surfacePressed }]}
       testID={testID}
     >
@@ -43,7 +51,7 @@ export function PlayerRow({ state, player, hideSecrets, onPress, testID }: { sta
           {player.name}
         </AppText>
         {player.alive ? (
-          <SecretText text={role?.name ?? player.roleId} hidden={hideSecrets} tone={teamColor(colors, player.team)} onPress={onPress} />
+          <SecretText text={role?.name ?? player.roleId} hidden={hideSecrets} tone={teamColor(colors, player.team)} peek={peek} />
         ) : (
           <AppText variant="caption" tone="faint" numberOfLines={1}>
             {player.death ? `${DEATH_CAUSE_LABELS[player.death.cause]} · ${player.death.phaseLabel}` : 'Éliminé(e)'}

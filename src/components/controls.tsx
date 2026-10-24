@@ -87,17 +87,19 @@ export function Stepper({ value, min, max, onChange, label, testID }: { value: n
     onChange(v);
   };
   return (
-    <View style={styles.stepper} accessibilityRole="adjustable" accessibilityLabel={label} accessibilityValue={{ min, max, now: value }} testID={testID}
+    // Un seul élément pour VoiceOver (« ajustable » : balayer vers le haut ou le bas) ;
+    // les boutons − et + restent pour le doigt mais sont masqués aux lecteurs d'écran.
+    <View style={styles.stepper} accessible accessibilityRole="adjustable" accessibilityLabel={label} accessibilityValue={{ min, max, now: value }} testID={testID}
       accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
       onAccessibilityAction={(e) => set(e.nativeEvent.actionName === 'increment' ? value + 1 : value - 1)}
     >
-      <Pressable accessibilityRole="button" accessibilityLabel={`Diminuer ${label}`} onPress={() => set(value - 1)} disabled={value <= min} style={[styles.stepBtn, { borderColor: colors.borderStrong, opacity: value <= min ? 0.35 : 1 }]} testID={testID ? `${testID}-minus` : undefined}>
+      <Pressable accessibilityElementsHidden importantForAccessibility="no" accessibilityRole="button" accessibilityLabel={`Diminuer ${label}`} onPress={() => set(value - 1)} disabled={value <= min} style={[styles.stepBtn, { borderColor: colors.borderStrong, opacity: value <= min ? 0.35 : 1 }]} testID={testID ? `${testID}-minus` : undefined}>
         <Icon name="minus" color={colors.text} />
       </Pressable>
       <AppText variant="number" style={styles.stepValue} align="center">
         {value}
       </AppText>
-      <Pressable accessibilityRole="button" accessibilityLabel={`Augmenter ${label}`} onPress={() => set(value + 1)} disabled={value >= max} style={[styles.stepBtn, { borderColor: colors.borderStrong, opacity: value >= max ? 0.35 : 1 }]} testID={testID ? `${testID}-plus` : undefined}>
+      <Pressable accessibilityElementsHidden importantForAccessibility="no" accessibilityRole="button" accessibilityLabel={`Augmenter ${label}`} onPress={() => set(value + 1)} disabled={value >= max} style={[styles.stepBtn, { borderColor: colors.borderStrong, opacity: value >= max ? 0.35 : 1 }]} testID={testID ? `${testID}-plus` : undefined}>
         <Icon name="plus" color={colors.text} />
       </Pressable>
     </View>
@@ -122,13 +124,15 @@ export function VolumeControl({ label, value, onChange, disabled, testID }: { la
       </View>
       <View
         style={styles.volumeRow}
+        testID={testID ? `${testID}-adjust` : undefined}
+        accessible
         accessibilityRole="adjustable"
         accessibilityLabel={label}
         accessibilityValue={{ min: 0, max: 100, now: level * 10, text: `${level * 10} %` }}
         accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
         onAccessibilityAction={(e) => set(e.nativeEvent.actionName === 'increment' ? level + 1 : level - 1)}
       >
-        <Pressable disabled={disabled} accessibilityLabel={`Baisser ${label}`} accessibilityRole="button" onPress={() => set(level - 1)} style={styles.volBtn} testID={testID ? `${testID}-minus` : undefined}>
+        <Pressable disabled={disabled} accessibilityElementsHidden importantForAccessibility="no" accessibilityLabel={`Baisser ${label}`} accessibilityRole="button" onPress={() => set(level - 1)} style={styles.volBtn} testID={testID ? `${testID}-minus` : undefined}>
           <Icon name="minus" color={colors.textMuted} size={18} />
         </Pressable>
         <View style={styles.bars}>
@@ -143,7 +147,7 @@ export function VolumeControl({ label, value, onChange, disabled, testID }: { la
             />
           ))}
         </View>
-        <Pressable disabled={disabled} accessibilityLabel={`Monter ${label}`} accessibilityRole="button" onPress={() => set(level + 1)} style={styles.volBtn} testID={testID ? `${testID}-plus` : undefined}>
+        <Pressable disabled={disabled} accessibilityElementsHidden importantForAccessibility="no" accessibilityLabel={`Monter ${label}`} accessibilityRole="button" onPress={() => set(level + 1)} style={styles.volBtn} testID={testID ? `${testID}-plus` : undefined}>
           <Icon name="plus" color={colors.textMuted} size={18} />
         </Pressable>
       </View>

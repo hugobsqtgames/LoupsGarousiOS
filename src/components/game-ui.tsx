@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { RoleDefinition, Team } from '@/engine';
 import { useTheme } from '@/theme/theme-context';
@@ -48,12 +48,12 @@ export function PlayerAvatar({ name, alive = true, mayor, team, size = 44 }: { n
 }
 
 /**
- * Texte secret : masqué tant que le MJ ne maintient pas l'appui (appui long).
- * Un appui court est transmis à `onPress` (ex. ouvrir la fiche du joueur).
+ * Texte secret : masqué tant que `peek` est faux. L'appui long qui le révèle
+ * est géré par l'élément qui le contient (ligne de joueur) : un bouton imbriqué
+ * dans un autre serait invisible pour VoiceOver et invalide sur le web.
  */
-export function SecretText({ text, hidden, tone, onPress }: { text: string; hidden: boolean; tone?: string; onPress?: () => void }) {
+export function SecretText({ text, hidden, tone, peek = false }: { text: string; hidden: boolean; tone?: string; peek?: boolean }) {
   const { colors } = useTheme();
-  const [peek, setPeek] = useState(false);
   if (!hidden) {
     return (
       <AppText variant="small" color={tone ?? colors.textMuted} numberOfLines={1}>
@@ -62,19 +62,9 @@ export function SecretText({ text, hidden, tone, onPress }: { text: string; hidd
     );
   }
   return (
-    <Pressable
-      onPress={onPress}
-      onLongPress={() => setPeek(true)}
-      onPressOut={() => setPeek(false)}
-      delayLongPress={250}
-      accessibilityRole="button"
-      accessibilityLabel="Rôle masqué, maintenir pour afficher"
-      hitSlop={8}
-    >
-      <AppText variant="small" color={peek ? (tone ?? colors.textMuted) : colors.textFaint} numberOfLines={1}>
-        {peek ? text : '•••• rôle masqué'}
-      </AppText>
-    </Pressable>
+    <AppText variant="small" color={peek ? (tone ?? colors.textMuted) : colors.textFaint} numberOfLines={1} testID="secret-text">
+      {peek ? text : '•••• rôle masqué'}
+    </AppText>
   );
 }
 
