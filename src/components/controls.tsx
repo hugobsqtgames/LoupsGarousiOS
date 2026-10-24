@@ -62,6 +62,8 @@ export function Segmented<T extends string | number>({ options, value, onChange,
               haptics.tap();
               onChange(o.value);
             }}
+            // 38 pt visibles + 4 pt de marge tactile en haut et en bas : cible de 46 pt (recommandation Apple : 44).
+            hitSlop={{ top: 4, bottom: 4 }}
             style={[styles.segment, active && { backgroundColor: colors.accent }]}
           >
             <AppText variant="caption" color={active ? colors.onAccent : colors.textMuted} numberOfLines={2} align="center">

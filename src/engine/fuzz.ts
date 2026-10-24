@@ -8,7 +8,8 @@ import { createRng, pick, shuffle } from './rng';
 import { activeBallot } from './selectors';
 import { eventDeck } from './events';
 import { DEFAULT_VARIANTS } from './variants';
-import type { GameAction, GameRecord, GameSetup, GameState, PlayerId, StepPayload, Variants } from './types';
+import { CUSTOM_ACTIONS, CUSTOM_ON_DEATH, CUSTOM_SCHEDULES, CUSTOM_WIN_CONDITIONS, validateCustomRole } from './roles/custom';
+import type { CustomRoleDef, RoleId, GameAction, GameRecord, GameSetup, GameState, PlayerId, StepPayload, Team, Variants } from './types';
 
 /**
  * Générateur de parties aléatoires pour les tests de robustesse (« monkey
@@ -30,7 +31,7 @@ export interface FuzzReport {
   stepKinds: Record<string, number>;
 }
 
-function randomSetup(seed: number, override: Partial<Variants> = {}): GameSetup {
+function randomSetup(seed: number, override: Partial<Variants> = {}, customCount = 0): GameSetup {
   const rng = createRng(seed);
   const n = 5 + Math.floor(rng() * 20);
   const complexity = pick<Complexity>(['decouverte', 'equilibre', 'riche'], rng);
@@ -67,6 +68,31 @@ function randomSetup(seed: number, override: Partial<Variants> = {}): GameSetup 
     eventFrequency: pick([1, 2, 3] as const, rng),
     ...override,
   };
+  // Rôles personnalisés aléatoires (définitions valides) à la place de Simples Villageois.
+  const customRoles: CustomRoleDef[] = [];
+  for (let k = 0; k < customCount; k++) {
+    const idx = roles.findIndex((r) => (['villageois', 'chasseur', 'salvateur', 'idiot', 'ancien', 'corbeau', 'renard', 'montreur-ours', 'servante'] as RoleId[]).includes(r));
+    if (idx < 0) break;
+    const team = pick<Team>(['village', 'wolves', 'solo'], rng);
+    const winCondition = team === 'solo' ? pick(CUSTOM_WIN_CONDITIONS.filter((w) => w !== 'camp'), rng) : 'camp';
+    const nightAction = winCondition === 'all-marked' ? 'mark' : pick(CUSTOM_ACTIONS, rng);
+    const res = validateCustomRole({
+      id: `custom:fuzz-${seed}-${k}`,
+      name: `Perso ${k + 1}`,
+      team,
+      description: 'Rôle généré par le fuzzing.',
+      nightAction,
+      schedule: pick(CUSTOM_SCHEDULES, rng),
+      uses: rng() < 0.5 ? null : 1 + Math.floor(rng() * 3),
+      canTargetSelf: rng() < 0.5,
+      onDeath: pick(CUSTOM_ON_DEATH, rng),
+      wakeOrder: Math.floor(rng() * 101),
+      winCondition,
+    });
+    if (!res.ok) continue;
+    customRoles.push(res.role);
+    roles[idx] = res.role.id;
+  }
   return {
     formatVersion: 1,
     id: `fuzz-${seed}`,
@@ -76,7 +102,7 @@ function randomSetup(seed: number, override: Partial<Variants> = {}): GameSetup 
     assignments: Object.fromEntries(players.map((p, i) => [p.id, roles[i]])),
     extraCards: comp.extraCards,
     variants,
-    customRoles: [],
+    customRoles,
     sectGroups: Object.fromEntries(players.map((p, i) => [p.id, i % 2 === 0 ? 'A' : 'B'])),
   };
 }
@@ -176,9 +202,9 @@ export function fuzzGame(seed: number, maxActions = 600): FuzzReport {
 }
 
 /** Comme `fuzzGame`, en renvoyant aussi l'enregistrement et l'état final (tests de persistance). */
-export function fuzzPlay(seed: number, maxActions = 600, override: Partial<Variants> = {}): { report: FuzzReport; record: GameRecord; state: GameState } {
+export function fuzzPlay(seed: number, maxActions = 600, override: Partial<Variants> = {}, customCount = 0): { report: FuzzReport; record: GameRecord; state: GameState } {
   const rng = createRng(seed * 7919 + 13);
-  const setup = randomSetup(seed, override);
+  const setup = randomSetup(seed, override, customCount);
   const timeline = Timeline.load({ setup, actions: [] }).timeline;
   let record: GameRecord = timeline.record;
   let state = timeline.state;

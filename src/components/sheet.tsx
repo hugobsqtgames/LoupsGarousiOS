@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/theme/theme-context';
@@ -14,7 +14,8 @@ export function Sheet({ visible, title, subtitle, onClose, children, footer, tes
   const reduceMotion = useReduceMotion();
   return (
     <Modal visible={visible} transparent animationType={reduceMotion ? "none" : "slide"} onRequestClose={onClose} statusBarTranslucent>
-      <View style={[styles.backdrop, { backgroundColor: colors.overlay }]}>
+      {/* Le clavier iOS ne recouvre pas les champs de la feuille (note du MJ, nom d'une composition). */}
+      <KeyboardAvoidingView style={[styles.backdrop, { backgroundColor: colors.overlay }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Pressable style={styles.dismiss} onPress={onClose} accessibilityRole="button" accessibilityLabel="Fermer" />
         <View style={[styles.sheet, { backgroundColor: colors.surfaceRaised, borderColor: colors.borderStrong, paddingBottom: insets.bottom + spacing.md }]} testID={testID} accessibilityViewIsModal>
           <View style={[styles.grabber, { backgroundColor: colors.borderStrong }]} />
@@ -36,7 +37,7 @@ export function Sheet({ visible, title, subtitle, onClose, children, footer, tes
           </ScrollView>
           {footer ? <View style={styles.footer}>{footer}</View> : null}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
