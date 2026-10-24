@@ -19,7 +19,6 @@ function randomText(rng: () => number, max: number): string {
 function wellFormed(svg: string): string[] {
   const problems: string[] = [];
   if (/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(svg)) problems.push('demi-caractère (surrogate isolé)');
-  // eslint-disable-next-line no-control-regex
   if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/.test(svg)) problems.push('caractère de contrôle');
   const text = svg.replace(/<[a-zA-Z/][^<>]*>/g, '');
   if (/[<>]/.test(text)) problems.push('chevron non échappé');

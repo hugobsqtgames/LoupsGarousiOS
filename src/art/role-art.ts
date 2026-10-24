@@ -331,7 +331,6 @@ function frame(p: Palette, title: string | null): string {
 
 function escapeXml(s: string): string {
   // Caractères interdits en XML (contrôle) retirés : ils rendraient l'image illisible.
-  // eslint-disable-next-line no-control-regex
   return s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
