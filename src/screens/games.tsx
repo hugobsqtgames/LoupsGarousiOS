@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { WINNER_LABELS } from '@/engine';
 import { Button, IconButton } from '@/components/button';
 import { Segmented } from '@/components/controls';
@@ -45,16 +45,24 @@ export function GamesScreen() {
         </EmptyState>
       ) : (
         list.map((g) => (
-          <Panel key={g.id} onPress={() => router.push({ pathname: '/game/[id]', params: { id: g.id } })} testID={`game-${g.id}`} accessibilityLabel={`Ouvrir ${g.name}`}>
+          // Ouvrir et Supprimer sont deux boutons côte à côte (et non l'un dans
+          // l'autre) : VoiceOver atteint chacun d'eux.
+          <Panel key={g.id}>
             <View style={styles.head}>
-              <View style={styles.flex}>
+              <Pressable onPress={() => router.push({ pathname: '/game/[id]', params: { id: g.id } })} accessibilityRole="button" accessibilityLabel={`Ouvrir ${g.name}`} style={({ pressed }) => [styles.open, pressed && { opacity: 0.7 }]} testID={`game-${g.id}`}>
                 <AppText variant="heading" numberOfLines={1}>
                   {g.name}
                 </AppText>
                 <AppText variant="caption" tone="muted">
                   {formatDate(g.updatedAt)} · {g.playerCount} joueurs
                 </AppText>
-              </View>
+                <View style={styles.row}>
+                  {g.status === 'ended' ? <Chip label={g.winner ? `Victoire : ${WINNER_LABELS[g.winner]}` : 'Terminée'} color={colors.accent} /> : <Chip label={g.phaseLabel} color={colors.info} />}
+                  <AppText variant="caption" tone="faint">
+                    {g.aliveCount} survivant(s) · {g.nights} nuit(s)
+                  </AppText>
+                </View>
+              </Pressable>
               <IconButton
                 icon="trash"
                 label={`Supprimer ${g.name}`}
@@ -72,12 +80,6 @@ export function GamesScreen() {
                 testID={`delete-${g.id}`}
               />
             </View>
-            <View style={styles.row}>
-              {g.status === 'ended' ? <Chip label={g.winner ? `Victoire : ${WINNER_LABELS[g.winner]}` : 'Terminée'} color={colors.accent} /> : <Chip label={g.phaseLabel} color={colors.info} />}
-              <AppText variant="caption" tone="faint">
-                {g.aliveCount} survivant(s) · {g.nights} nuit(s)
-              </AppText>
-            </View>
           </Panel>
         ))
       )}
@@ -88,5 +90,6 @@ export function GamesScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  open: { flex: 1, gap: spacing.xs, minHeight: 44 },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
 });

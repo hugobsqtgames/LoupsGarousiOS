@@ -86,8 +86,11 @@ describe('accessibilité (audit VoiceOver automatisé)', () => {
     await tap('open-night');
     await screen.findByTestId('step-card');
     problems.push(...audit('nuit (Cupidon)'));
-    for (const path of ['/settings', '/stats', '/roles', '/new'] as const) {
-      await act(async () => router.push(path));
+    const main = ['/settings', '/stats', '/roles', '/new'];
+    // Écrans secondaires (audit QA) : liste des parties, fiches, outils de partie.
+    const more = ['/games', '/help', '/roles/voyante', '/roles/custom', '/settings/variants', '/settings/data', `/game/${id}/history`, `/game/${id}/timeline`, `/game/${id}/table`, `/game/${id}/player/p1`, `/game/${id}/vote`, `/game/${id}/deal`];
+    for (const path of [...main, ...more]) {
+      await act(async () => router.push(path as never));
       await act(async () => {
         jest.advanceTimersByTime(600);
       });
@@ -95,6 +98,6 @@ describe('accessibilité (audit VoiceOver automatisé)', () => {
     }
     expect(problems).toEqual([]);
     // L'audit porte réellement sur des contrôles (et non sur un écran vide).
-    for (const [where, n] of Object.entries(checked)) expect([where, n >= 5]).toEqual([where, true]);
+    for (const [where, n] of Object.entries(checked)) expect([where, n >= (more.includes(where) ? 1 : 5)]).toEqual([where, true]);
   });
 });
