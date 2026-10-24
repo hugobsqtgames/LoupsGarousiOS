@@ -1,5 +1,7 @@
 # Rapport de tests
 
+> Audit QA d’octobre 2026 (17 corrections, 10 699 tests Jest, monkey longs, chiffres à jour) : voir [`AUDIT_QA.md`](AUDIT_QA.md).
+
 Environnement : conteneur Linux (4 cœurs), Node 22.22, Chromium (Playwright 1.56). **Aucun simulateur iOS ni appareil physique n’était disponible** : les tests natifs iOS restent à faire (voir la fin du document). Date : 23 octobre 2026 (mise à jour après la série d’améliorations).
 
 ## Synthèse

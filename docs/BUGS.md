@@ -27,6 +27,7 @@
 | 20 | Libellé « Dramatique » coupé sur deux lignes dans le sélecteur de style | revue des captures | libellé « Drame » | captures |
 | 21 | Ciels du village virant au magenta dans les illustrations | revue des images | teinte resserrée | planche `docs/illustrations` |
 | 22 | Monkey test (outil de test) : clics bloqués 2 s sur les lignes masquées par une feuille ouverte, retour navigateur vers `about:blank`, saisie sans délai maximal pouvant bloquer indéfiniment | monkey tests (graines 11, 37, 101) | appui aux coordonnées comme un doigt, retour à l’app, délais sur les saisies — **aucune erreur de l’application** n’était en cause | `monkey.spec.ts` (3 graines + 1 000 gestes) |
+| 23–39 | Audit QA d'octobre 2026 : 17 défauts (course entre ouvertures, partie supprimée ressuscitée, création non relisible, export bloqué, import fragile, absence d'écran de secours, image récapitulative invalide avec émojis, clavier iOS dans les feuilles…) | campagne de tests de l'audit | voir `docs/AUDIT_QA.md` § 4 | `src/__tests__/campaign/`, `game-store.test.ts`, `audit-regressions.test.ts`, `svg-safety.test.ts`, `e2e/robustness.spec.ts` |
 
 Incident de processus (non applicatif) : la copie initiale du modèle Expo avait remplacé le dossier `.git` du dépôt ; détecté avant tout envoi, la branche demandée a été recréée proprement.
 
