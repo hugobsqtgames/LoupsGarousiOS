@@ -69,13 +69,14 @@ for (const seed of SEEDS) {
           const n = await candidates.count();
           if (n === 0) continue;
           const el = candidates.nth(Math.floor(random() * n));
-          const tid = (await el.getAttribute('data-testid').catch(() => null)) ?? (await el.getAttribute('aria-label').catch(() => null)) ?? '?';
+          // Délai maximal : l'écran peut avoir changé depuis le comptage (l'élément n'existe plus).
+          const tid = (await el.getAttribute('data-testid', { timeout: 2000 }).catch(() => null)) ?? (await el.getAttribute('aria-label', { timeout: 2000 }).catch(() => null)) ?? '?';
           clicked.add(tid);
           what = tid;
           if (process.env.MONKEY_TRACE) console.log(`geste ${step} : ${tid} ${page.url()}`);
           // Appui aux coordonnées de l'élément, comme un doigt : si une feuille ou un
           // dialogue le recouvre, c'est l'élément du dessus qui reçoit l'appui.
-          const box = await el.boundingBox().catch(() => null);
+          const box = await el.boundingBox({ timeout: 2000 }).catch(() => null);
           if (box) await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2).catch(() => undefined);
         }
       }
