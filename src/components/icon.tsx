@@ -1,3 +1,4 @@
+import { View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { ROLE_GLYPHS } from '@/art/glyphs';
 
@@ -84,17 +85,21 @@ interface IconProps {
 }
 
 export function Icon({ name, size = 22, color, strokeWidth = 1.75, filled = false }: IconProps) {
+  // Masquage pour VoiceOver porté par une vue : sur le web, react-native-svg
+  // transmettrait ces propriétés telles quelles à la balise <svg> (avertissement React).
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <Path
-        d={PATHS[name]}
-        stroke={color}
-        strokeWidth={strokeWidth}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill={filled ? color : 'none'}
-        fillOpacity={filled ? 0.22 : 0}
-      />
-    </Svg>
+    <View style={{ width: size, height: size }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <Svg width={size} height={size} viewBox="0 0 24 24">
+        <Path
+          d={PATHS[name]}
+          stroke={color}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill={filled ? color : 'none'}
+          fillOpacity={filled ? 0.22 : 0}
+        />
+      </Svg>
+    </View>
   );
 }
