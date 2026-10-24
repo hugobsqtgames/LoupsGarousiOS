@@ -32,11 +32,15 @@ const H = 1350;
 const TEAM = { village: '#d9b25f', wolves: '#e0574a', solo: '#a879f0' };
 
 function esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  // Caractères interdits en XML (contrôle) retirés : ils rendraient l'image illisible.
+  // eslint-disable-next-line no-control-regex
+  return s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+/** Coupe en caractères réels (un émoji n'est jamais coupé en deux, ce qui rendrait le SVG invalide). */
 function clip(s: string, max: number): string {
-  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
+  const chars = Array.from(s);
+  return chars.length > max ? `${chars.slice(0, max - 1).join('')}…` : s;
 }
 
 /** Découpe un texte en lignes d'au plus `max` caractères (sur les espaces). */
