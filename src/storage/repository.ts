@@ -395,8 +395,21 @@ export class Repository {
         exportedAt: now,
         schemaVersion: SCHEMA_VERSION,
         games,
-        compositions: comps.map((c) => JSON.parse(c.data_json) as SavedComposition),
-        customRoles: parseCustomRoles(roles.map((r) => JSON.parse(r.data_json))),
+        // Une ligne illisible est écartée : elle ne doit pas empêcher la sauvegarde du reste.
+        compositions: comps.flatMap((c) => {
+          try {
+            return [JSON.parse(c.data_json) as SavedComposition];
+          } catch {
+            return [];
+          }
+        }),
+        customRoles: roles.flatMap((r) => {
+          try {
+            return parseCustomRoles([JSON.parse(r.data_json)]);
+          } catch {
+            return [];
+          }
+        }),
         settings,
       };
     });
@@ -425,7 +438,10 @@ export class Repository {
     const compositions = (Array.isArray(b.compositions) ? b.compositions : []).map((c, i) => {
       if (typeof c !== 'object' || c === null) throw new DataError(`Composition ${i + 1} invalide.`);
       const cc = c as Record<string, unknown>;
-      if (typeof cc.id !== 'string' || typeof cc.name !== 'string' || !Array.isArray(cc.roles)) throw new DataError(`Composition ${i + 1} invalide.`);
+      const roleList = (v: unknown) => Array.isArray(v) && v.every((r) => typeof r === 'string');
+      if (typeof cc.id !== 'string' || typeof cc.name !== 'string' || !roleList(cc.roles) || (cc.extraCards !== undefined && !roleList(cc.extraCards)) || (cc.playerNames !== undefined && !roleList(cc.playerNames))) {
+        throw new DataError(`Composition ${i + 1} invalide.`);
+      }
       return cc as unknown as SavedComposition;
     });
     const customRoles = parseCustomRoles(b.customRoles ?? []);
@@ -449,7 +465,7 @@ export class Repository {
           await this.db.run(
             `INSERT INTO games (id, name, created_at, updated_at, status, summary_json, setup_json, actions_json, action_count, checksum, format_version)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [rec.setup.id, rec.setup.name, rec.setup.createdAt, now, summary.status, JSON.stringify(summary), setupJson, actionsJson, rec.actions.length, checksumOf(setupJson, actionsJson), 1],
+            [rec.setup.id, rec.setup.name, rec.setup.createdAt, now, summary.status, JSON.stringify(summary), setupJson, actionsJson, rec.actions.length, checksumOf(setupJson, actionsJson), rec.setup.formatVersion],
           );
           report.games += 1;
         }

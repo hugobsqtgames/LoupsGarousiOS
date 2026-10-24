@@ -6,6 +6,12 @@ import { getRepository } from './services';
 
 export const SETTINGS_KEY = 'app-settings';
 
+/** Ferme la partie ouverte si elle est concernée (`null` : toutes). Fourni par le magasin de partie. */
+let closeOpenGame: (id: string | null) => Promise<void> = async () => undefined;
+export function registerOpenGameGuard(fn: (id: string | null) => Promise<void>): void {
+  closeOpenGame = fn;
+}
+
 interface AppStore {
   status: 'loading' | 'ready' | 'error';
   error: string | null;
@@ -80,6 +86,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   async deleteGame(id) {
+    await closeOpenGame(id);
     const repo = await getRepository();
     await repo.deleteGame(id);
     await get().refreshGames();
@@ -115,6 +122,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   async importJson(text, includeSettings) {
+    // La partie ouverte est enregistrée et fermée avant l'import.
+    await closeOpenGame(null);
     const repo = await getRepository();
     const report = await repo.importData(text, { includeSettings });
     await get().init();
@@ -122,6 +131,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   async resetAll() {
+    await closeOpenGame(null);
     const repo = await getRepository();
     await repo.resetAll();
     await get().init();

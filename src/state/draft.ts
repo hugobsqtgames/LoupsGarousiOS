@@ -5,6 +5,7 @@ import {
   DEFAULT_VARIANTS,
   duplicateNames,
   generateComposition,
+  MAX_NAME_LENGTH,
   normalizeName,
   shuffle,
   validateSetup,
@@ -234,13 +235,15 @@ export function draftFromSetup(setup: GameSetup, seed = Date.now() % 1_000_000):
 }
 
 export function draftFromComposition(c: SavedComposition, base: Draft, makePlayerId: () => string): Draft {
-  const players = c.playerNames.length > 0 ? c.playerNames.map((name) => ({ id: makePlayerId(), name })) : base.players;
+  // Les compositions importées ou anciennes peuvent omettre des champs.
+  const names = Array.isArray(c.playerNames) ? c.playerNames.filter((n): n is string => typeof n === 'string').map((n) => n.slice(0, MAX_NAME_LENGTH)) : [];
+  const players = names.length > 0 ? names.map((name) => ({ id: makePlayerId(), name })) : base.players;
   return {
     ...base,
-    name: c.name,
+    name: typeof c.name === 'string' ? c.name.slice(0, 60) : '',
     players,
     roleCounts: countsFromRoles(c.roles),
-    ...splitExtraCards(c.roles, c.extraCards),
+    ...splitExtraCards(c.roles, Array.isArray(c.extraCards) ? c.extraCards : []),
     assignments: {},
     explanations: [],
   };

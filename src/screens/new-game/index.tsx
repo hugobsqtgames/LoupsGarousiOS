@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { normalizeVariants } from '@/engine';
 import { Button } from '@/components/button';
 import { useFeedback } from '@/components/feedback';
 import { Screen } from '@/components/screen';
@@ -62,7 +63,7 @@ export function NewGameScreen() {
     if (!hydrated) return;
     if (params.composition) {
       const c = compositions.find((x) => x.id === params.composition);
-      if (c) reset(settings.defaultVariants, { ...draftFromComposition(c, emptyDraft(settings.defaultVariants), () => makeId('pl')), variants: { ...settings.defaultVariants, ...(c.variants as object) } });
+      if (c) reset(settings.defaultVariants, { ...draftFromComposition(c, emptyDraft(settings.defaultVariants), () => makeId('pl')), variants: normalizeVariants({ ...settings.defaultVariants, ...(typeof c.variants === 'object' && c.variants !== null ? c.variants : {}) }) });
       router.setParams({ composition: undefined });
     } else if (params.fresh) {
       reset(settings.defaultVariants);

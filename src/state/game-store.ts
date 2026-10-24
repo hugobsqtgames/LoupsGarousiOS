@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { setupErrors, Timeline, type GameAction, type GameRecord, type GameSetup, type GameState, type ReplayFailure } from '@/engine';
+import { parseSetup } from '@/storage/validation';
 import { SaveScheduler, type SaveState } from './save-scheduler';
 import { getRepository } from './services';
-import { useAppStore } from './app-store';
+import { registerOpenGameGuard, useAppStore } from './app-store';
 
 export type ActionResult = { ok: true } | { ok: false; error: string; code?: string };
 
@@ -31,6 +32,8 @@ interface GameStore {
 
 let timeline: Timeline | null = null;
 let scheduler: SaveScheduler<{ record: GameRecord; state: GameState }> | null = null;
+/** Jeton du dernier chargement demandé : un chargement plus ancien qui se termine après est ignoré. */
+let loadToken = 0;
 
 function makeScheduler(set: (p: Partial<GameStore>) => void) {
   return new SaveScheduler<{ record: GameRecord; state: GameState }>(
@@ -64,11 +67,15 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     async open(id) {
       if (get().gameId === id && timeline) return true;
+      const token = ++loadToken;
       await get().close();
+      if (token !== loadToken) return false;
       set({ loading: true, loadError: null, warnings: [], gameId: id });
       try {
         const repo = await getRepository();
         const loaded = await repo.loadGame(id);
+        // Une autre partie a été demandée entre-temps : ce résultat est périmé.
+        if (token !== loadToken) return false;
         const { timeline: t, failure } = Timeline.load(loaded.record);
         timeline = t;
         scheduler = makeScheduler(set);
@@ -85,15 +92,25 @@ export const useGameStore = create<GameStore>((set, get) => {
         });
         return true;
       } catch (e) {
+        if (token !== loadToken) return false;
         timeline = null;
         set({ loading: false, loadError: e instanceof Error ? e.message : String(e), state: null, record: null });
         return false;
       }
     },
 
-    async create(setup) {
-      const errors = setupErrors(setup);
+    async create(input) {
+      const errors = setupErrors(input);
       if (errors.length > 0) return { ok: false, error: errors.map((e) => e.message).join('\n') };
+      // La configuration est passée par le validateur de chargement : une partie
+      // créée est toujours relisible, et la partie jouée est exactement celle rejouée.
+      let setup: GameSetup;
+      try {
+        setup = parseSetup(JSON.parse(JSON.stringify(input)));
+      } catch (e) {
+        return { ok: false, error: `Configuration invalide : ${e instanceof Error ? e.message : String(e)}` };
+      }
+      loadToken += 1;
       await get().close();
       const { timeline: t } = Timeline.load({ setup, actions: [] });
       try {
@@ -119,7 +136,14 @@ export const useGameStore = create<GameStore>((set, get) => {
     },
 
     async close() {
-      if (scheduler) await scheduler.flush();
+      if (scheduler) {
+        await scheduler.flush();
+        // Dernière tentative pour une écriture échouée avant de libérer la partie.
+        if (scheduler.current.status === 'error') {
+          scheduler.retry();
+          await scheduler.flush();
+        }
+      }
       timeline = null;
       scheduler = null;
       set({ gameId: null, state: null, record: null, warnings: [], save: INITIAL_SAVE });
@@ -178,4 +202,15 @@ export const useGameStore = create<GameStore>((set, get) => {
       set({ warnings: [] });
     },
   };
+});
+
+// Une partie supprimée (ou toutes, lors d'un effacement / import) ne doit pas
+// rester ouverte en mémoire : elle serait réaffichée, puis réécrite à la
+// prochaine action.
+registerOpenGameGuard(async (id) => {
+  const { gameId, close } = useGameStore.getState();
+  if (gameId !== null && (id === null || gameId === id)) {
+    loadToken += 1;
+    await close();
+  }
 });
