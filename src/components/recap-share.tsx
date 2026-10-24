@@ -28,7 +28,10 @@ export function RecapShareButton({ data, fileName }: { data: RecapData; fileName
         return;
       }
       setBusy(true);
+      // Après l'expiration du délai, une image arrivée en retard n'est plus partagée.
+      let expired = false;
       const timer = setTimeout(() => {
+        expired = true;
         setBusy(false);
         toast('La création de l’image a échoué.', 'error');
         resolve();
@@ -36,6 +39,7 @@ export function RecapShareButton({ data, fileName }: { data: RecapData; fileName
       try {
         svg.toDataURL(
           (base64) => {
+            if (expired) return;
             clearTimeout(timer);
             sharePng(base64, fileName)
               .catch((e: Error) => toast(`Partage impossible : ${e.message}`, 'error'))

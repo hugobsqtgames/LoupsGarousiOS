@@ -5,7 +5,7 @@ import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium';
 import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
 import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -15,6 +15,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AudioProvider } from '@/audio/audio-context';
 import { expoAudioBackend } from '@/audio/expo-backend';
 import { Button } from '@/components/button';
+import { ErrorFallback } from '@/components/error-fallback';
 import { FeedbackProvider } from '@/components/feedback';
 import { AppText } from '@/components/text';
 import { useAppStore } from '@/state/app-store';
@@ -53,6 +54,14 @@ function StartupError({ message, onRetry }: { message: string; onRetry: () => vo
       <Button label="Réessayer" icon="refresh" onPress={onRetry} />
     </View>
   );
+}
+
+/** Filet de sécurité : une erreur d'affichage montre un écran de secours au lieu de fermer l'app. */
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  useEffect(() => {
+    SplashScreen.hideAsync().catch(() => undefined);
+  }, []);
+  return <ErrorFallback {...props} />;
 }
 
 export default function RootLayout() {

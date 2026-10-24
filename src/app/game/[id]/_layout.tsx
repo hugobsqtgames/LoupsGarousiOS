@@ -1,15 +1,21 @@
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams, type ErrorBoundaryProps } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useAudio } from '@/audio/audio-context';
 import { Button } from '@/components/button';
+import { ErrorFallback } from '@/components/error-fallback';
 import { AppText } from '@/components/text';
 import { useAppStore } from '@/state/app-store';
 import { resolveNightAmbience } from '@/settings/settings';
 import { useGameStore } from '@/state/game-store';
 import { useTheme } from '@/theme/theme-context';
 import { spacing } from '@/theme/themes';
+
+/** Erreur d'affichage pendant une partie : écran de secours (la partie est déjà enregistrée). */
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  return <ErrorFallback {...props} />;
+}
 
 /** Charge la partie, pilote l'ambiance sonore et garde l'écran allumé pendant le jeu. */
 export default function GameLayout() {

@@ -39,14 +39,40 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
   const [toastState, setToast] = useState<{ message: string; kind: ToastKind; id: number } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => () => {
-    if (timer.current) clearTimeout(timer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+      pending.current?.(false);
+    },
+    [],
+  );
 
-  const confirm = useCallback((opts: ConfirmOptions) => new Promise<boolean>((resolve) => setDialog({ ...opts, resolve })), []);
-  const alert = useCallback(async (title: string, message?: string) => {
-    await new Promise<boolean>((resolve) => setDialog({ title, message, alertOnly: true, confirmLabel: 'Compris', resolve }));
-  }, []);
+  // Un seul dialogue à la fois : un dialogue remplacé (double appui sur un
+  // bouton, par exemple) est résolu comme annulé au lieu de rester en attente.
+  const pending = useRef<((v: boolean) => void) | null>(null);
+  const open = useCallback(
+    (opts: ConfirmOptions) =>
+      new Promise<boolean>((resolve) => {
+        pending.current?.(false);
+        let settled = false;
+        const once = (v: boolean) => {
+          if (settled) return;
+          settled = true;
+          if (pending.current === once) pending.current = null;
+          resolve(v);
+        };
+        pending.current = once;
+        setDialog({ ...opts, resolve: once });
+      }),
+    [],
+  );
+  const confirm = useCallback((opts: ConfirmOptions) => open(opts), [open]);
+  const alert = useCallback(
+    async (title: string, message?: string) => {
+      await open({ title, message, alertOnly: true, confirmLabel: 'Compris' });
+    },
+    [open],
+  );
   const toast = useCallback((message: string, kind: ToastKind = 'success') => {
     if (timer.current) clearTimeout(timer.current);
     setToast({ message, kind, id: Date.now() });
