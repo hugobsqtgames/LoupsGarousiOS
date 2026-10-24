@@ -1,6 +1,9 @@
 # Audit QA — octobre 2026
 
-État final : **PARTIELLEMENT VALIDÉ**. Tout ce qui peut être exécuté sous Linux est validé. Rien n'a été vérifié sur un vrai iOS : pas de Xcode, pas de simulateur, pas d'appareil, pas d'identifiants EAS dans l'environnement.
+État final : **PARTIELLEMENT VALIDÉ**.
+- Tout ce qui peut être exécuté ici est validé, **en mode développement et en mode production**.
+- L'app iOS native est **compilée par Xcode** (EAS Build) en Debug et en Release.
+- Elle n'a **jamais été lancée** sur iOS : le simulateur EAS n'est pas ouvert sur le compte, et il n'y a ni Mac ni iPhone ici.
 
 ## 1. Résumé
 
@@ -8,11 +11,12 @@
 | --- | --- |
 | Moteur de règles (rejeu, annulation, correction) | validé par 3 000 parties de fuzz, 3 000 rejeux après relecture et 2 000 historiques altérés |
 | Stockage SQLite (sauvegarde, secours, import/export) | validé sur le moteur SQLite réel (`node:sqlite`) ; le pilote natif `expo-sqlite` n'a pas été exécuté |
-| Interface | validée dans Chromium (export web) : 15 tests de bout en bout et 3 750 gestes monkey, 0 erreur JavaScript |
-| Build iOS de production | **bundle JS Hermes produit** (`expo export -p ios`, 5,1 Mo) ; **pas de compilation native** (Xcode absent) |
-| Simulateur / appareil iOS | **non testés** |
+| Interface, mode production | validée dans Chromium (export web minifié, `__DEV__=false`) : 15 tests de bout en bout sur 15, sessions monkey, 0 erreur JavaScript |
+| Interface, mode développement | validée sur le serveur Metro (`expo start`, React en mode développement) : 15 sur 15, après 4 corrections propres à ce mode (§ 4bis) |
+| Build iOS native | **compilée par Xcode 27.1** sur EAS : Debug (build de développement) et Release (simulateur), « BUILD SUCCEEDED » toutes les deux |
+| Simulateur / appareil iOS | **non testés** (simulateur EAS non disponible sur le compte : liste d'attente) |
 
-17 défauts ont été trouvés et corrigés (§ 4). Chaque correction a son test de régression.
+22 défauts ont été trouvés et corrigés (§ 4 et 4bis). Chaque correction a son test de régression, sauf A12, A14 et A15 (§ 4).
 
 ## 2. Stack et environnement détectés
 
@@ -61,6 +65,20 @@ Le moteur a été exploré **par les tests** (fuzz, propriétés), et non relu l
 
 Correction de l'outil de test : `fuzz.ts` expose `fuzzPlay` et prend désormais en compte des variantes imposées et des rôles personnalisés. Avant, aucune partie de fuzz ne comportait de rôle personnalisé.
 
+## 4bis. Défauts révélés par le mode développement
+
+Le premier passage de bout en bout s'était fait uniquement sur l'export de production, où React ne signale pas les erreurs de structure. En mode développement :
+
+| # | Gravité | Défaut | Correction | Test |
+| --- | --- | --- | --- | --- |
+| A18 | P2 | Icônes : propriétés de masquage VoiceOver transmises à la balise `<svg>` (avertissement React ; le bandeau d'erreur du mode développement bloquait les appuis) | masquage porté par une vue englobante | E2E en mode développement (aucune erreur de console tolérée) |
+| A19 | P2 | Ligne de joueur : le texte « rôle masqué » était un bouton dans le bouton de la ligne. **Sur iOS, VoiceOver ne peut pas atteindre un bouton imbriqué** | l'appui long qui révèle le rôle est géré par la ligne ; indication VoiceOver « maintenir pour l'afficher » | `a11y.test.tsx` (règle « contrôle imbriqué » ; échouait avant) |
+| A20 | P2 | Liste des parties : bouton « Supprimer » dans le bouton « Ouvrir » (inatteignable avec VoiceOver) | deux boutons côte à côte | `a11y.test.tsx` (écran ajouté ; échouait avant) |
+| A21 | P3 | Volumes et minuteur : le conteneur « ajustable » n'était pas un élément accessible. Sur iOS, la valeur n'était pas annoncée et le balayage haut/bas ne faisait rien | `accessible` ; boutons − et + réservés au toucher | `settings.test.tsx` (toucher + action VoiceOver) |
+| A22 | outil de test | Monkey : attente sans délai d'un contrôle disparu entre le comptage et l'appui (délai dépassé sous charge) | délais de 2 s | 3 graines en parallèle, en mode développement et en production |
+
+L'audit VoiceOver automatisé couvre maintenant 18 écrans (6 auparavant). Il signale tout contrôle placé dans un autre contrôle.
+
 ## 5. Tests : chiffres réels
 
 **Tests Jest définis et exécutés : 10 699**
@@ -91,6 +109,17 @@ Campagne ajoutée par cet audit (`src/__tests__/campaign/`, 10 180 tests) :
 - 3 graines × 250 gestes (suite standard) et 6 graines × 500 gestes (101, 202, 303, 404, 505, 606).
 - Total : 3 750 gestes, 122 à 170 contrôles distincts touchés par session, 0 erreur JavaScript.
 
+**Bilan par mode (code final)**
+
+| Suite | Mode développement | Mode production |
+| --- | --- | --- |
+| Jest, tests sans interface (moteur, stockage, campagne : 10 691 tests) | 10 689 réussis, 0 échec, 2 ignorés | 10 689 réussis, 0 échec, 2 ignorés (`NODE_ENV=production`) |
+| Jest, tests d'interface (RNTL) | réussis, aucun avertissement React en console | **impossible** : React en production n'a pas `act`, nécessaire aux tests d'interface ; ces écrans sont couverts par les tests de bout en bout en production |
+| Bout en bout, 15 scénarios | 15/15 sur le serveur Metro (`E2E_DEV=1`), aucune erreur de console tolérée | 15/15 sur l'export minifié |
+| Captures d'écran, 5 parcours | — | 5/5 (captures de `docs/screenshots/web` régénérées) |
+| Monkey | 3 graines × 250 gestes, en parallèle | 3 × 250, puis 6 × 500 gestes (graines 101 à 606), 0 erreur |
+| iOS natif | build Debug compilée (EAS) | build Release compilée (EAS) ; bundle Hermes vérifié |
+
 **Objectif de 15 000 :** non atteint en tests distincts.
 - Exécutions réelles : 10 697 tests Jest réussis + 3 000 parties de fuzz + 15 scénarios de bout en bout + 9 sessions monkey ≈ 13 700 exécutions distinctes.
 - Aller au-delà aurait demandé de dupliquer des graines sans gain de couverture.
@@ -105,7 +134,16 @@ Campagne ajoutée par cet audit (`src/__tests__/campaign/`, 10 180 tests) :
 **Build**
 - `tsc --noEmit` : 0 erreur. `expo lint` : 0 erreur, 0 avertissement. `expo-doctor` : 20/20.
 - `expo export -p ios` : bundle Hermes de 5,1 Mo, 2 013 modules.
-- Compilation Xcode, signature, `eas build` : **non réalisés** (outil et identifiants absents).
+- **EAS Build iOS**, projet `@aazerty12/loups-garous-mj`, sur Xcode 27.1 et le SDK iOS Simulator 27.1. Les deux builds ont été lancées avant les corrections A18 à A21, qui ne modifient que du JavaScript :
+  - profil `development` (Debug, client de développement) : BUILD SUCCEEDED en 9 min ;
+  - profil `simulator-release` (Release, ajouté à `eas.json`) : BUILD SUCCEEDED en 17 min ;
+  - 0 erreur de compilation. Environ 2 700 avertissements, tous dans les en-têtes d'Expo, React Native et des dépendances (nullabilité Objective-C, etc.) : l'app n'a pas de code natif propre.
+- **App Release inspectée** (93 Mo) :
+  - `Info.plist` : identifiant `com.hugobsqtgames.loupsgarousmj`, version 1.0.0 (build 1), iOS 16.4 minimum, iPhone et iPad, 4 orientations, **aucune permission**, pas de mode arrière-plan, ATS strict (`NSAllowsArbitraryLoads: false`) ;
+  - manifeste de confidentialité présent : aucun suivi, aucune donnée collectée, 4 API déclarées ;
+  - `main.jsbundle` en bytecode Hermes (4,9 Mo) ; 15 sons, 6 polices et 20 images embarqués.
+- **App de développement** : le JavaScript est chargé depuis Metro (normal). Elle demande en plus l'accès au réseau local, propre aux clients de développement, absent de la Release.
+- **Non réalisé** : build signée pour appareil ou App Store (nécessite un compte Apple), exécution des apps (pas de simulateur).
 
 **iOS (`app.json`)**
 - Manifeste de confidentialité présent, `ITSAppUsesNonExemptEncryption: false`, aucune permission demandée (micro désactivé), pas de mode arrière-plan, iPad pris en charge, orientation libre.
@@ -136,7 +174,7 @@ Campagne ajoutée par cet audit (`src/__tests__/campaign/`, 10 180 tests) :
    - VoiceOver et texte agrandi ;
    - rotation sur iPad.
 
-   Commande : `npx eas-cli@latest build --profile development --platform ios` (nécessite un compte Expo et un compte Apple).
+   Les builds pour simulateur existent déjà (§ 6) : `npx eas-cli@latest build:list` pour les retrouver. Il faut un Mac pour les lancer, ou l'accès au simulateur EAS (liste d'attente : https://expo.dev/services/simulators). Pour un iPhone, il faut une build signée et donc un compte Apple.
 2. **Paramètres :** si deux écritures se suivent et que la première échoue, l'annulation restaure la valeur d'avant la première. Cas rare, non corrigé.
 3. **Brouillon de l'assistant :** enregistré 400 ms après la dernière saisie. Une fermeture forcée dans cet intervalle perd la dernière modification.
 4. Les limites déjà connues restent valables (`docs/BUGS.md`).
@@ -149,8 +187,11 @@ npx jest                                  # 10 699 tests (≈ 2 min 30 s)
 npx jest src/__tests__/campaign           # campagne de l'audit seule
 FUZZ_SEEDS=3000 npx jest src/engine/__tests__/fuzz.test.ts
 npx jest --coverage
-npx expo export -p web && npx playwright test
+npx expo export -p web && npx playwright test          # mode production
+E2E_DEV=1 npx playwright test                           # mode développement (serveur Metro)
+NODE_ENV=production npx jest src/engine src/storage src/__tests__/campaign   # Jest, React production (hors interface)
 MONKEY_SEED=101 MONKEY_STEPS=500 npx playwright test e2e/monkey.spec.ts
+npx eas-cli@latest build --platform ios --profile simulator-release
 npx expo export -p ios --output-dir /tmp/ios-export
 ```
 
